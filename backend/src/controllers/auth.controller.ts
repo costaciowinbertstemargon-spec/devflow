@@ -1,6 +1,8 @@
 import type { Request, Response } from "express";
 import { loginSchema, registerSchema } from "../utils/auth.validation.js";
 import { registerUser, loginUser } from "../services/auth.service.js";
+import type { AuthenticatedRequest } from "../middleware/auth.middleware.js";
+import { prisma } from "../config/database.js";
 
 export async function register(
     req: Request,
@@ -77,6 +79,51 @@ export async function login(
             });
         }
 
+        console.error(error);
+
+        return res.status(500).json({
+            status: "error",
+            message: "Something went wrong",
+        });
+    }
+}
+
+export async function getMe(
+    req: AuthenticatedRequest,
+    res: Response
+) {
+    try{
+        if (!req.user) {
+            return res.status(401).json({
+                status: "error",
+                message: "Authentication required",
+            });
+        }
+
+        const user = await prisma.user.findUnique({
+            where: {
+                id: req.user.userId,
+            },
+            select: {
+                id: true,
+                name: true,
+                email: true,
+                createdAt: true,
+            },
+        });
+
+        if (!user) {
+            return res.status(404).json({
+                status: "error",
+                message: "User not found",
+            });
+        }
+
+        return res.status(200).json({
+            status: "success",
+            user,
+        });
+    } catch (error) {
         console.error(error);
 
         return res.status(500).json({

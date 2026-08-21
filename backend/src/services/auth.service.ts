@@ -1,5 +1,5 @@
 import bcrypt from "bcrypt";
-import jwt from "jsonwebtoken";
+import jwt, { type SignOptions } from "jsonwebtoken";
 import { prisma } from "../config/database.js";
 import type { RegisterInput, LoginInput } from "../utils/auth.validation.js";
 
@@ -54,18 +54,21 @@ export async function loginUser(input: LoginInput) {
 
     const secret = process.env.JWT_SECRET;
 
-    if(!secret) {
+    if (!secret) {
         throw new Error("JWT_SECRET is not configured");
     }
+
+    const expiresIn: SignOptions["expiresIn"] =
+    (process.env.JWT_EXPIRES_IN as SignOptions["expiresIn"]) || "1h";
 
     const token = jwt.sign(
         {
             userId: user.id,
-            email: user.email
+            email: user.email,
         },
         secret,
         {
-            expiresIn: "1h",
+            expiresIn,
         }
     );
 
