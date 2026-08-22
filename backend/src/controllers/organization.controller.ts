@@ -2,6 +2,8 @@ import type { Response } from "express";
 import type { AuthenticatedRequest } from "../middleware/auth.middleware.js";
 import { createOrganization } from "../services/organization.service.js";
 import { addOrganizationMember } from "../services/organization_member.service.js";
+import { getOrganizationById } from "../services/organization.service.js";
+import type { OrganizationRequest } from "../middleware/organization.middleware.js";
 
 export async function createOrganizationController(
     req: AuthenticatedRequest,
@@ -123,4 +125,41 @@ export async function addMember(
             message: "Failed to add organization member",
         });
     }
+}
+
+export async function getOrganization(
+    req: OrganizationRequest,
+    res:Response
+) {
+   try {
+        if (!req.organization) {
+            return res.status(403).json({
+                status: "error",
+                message: "Organization access required",
+            });
+        }
+
+        const organization = await getOrganizationById(
+            req.organization.id
+        );
+
+        if (!organization) {
+            return res.status(404).json({
+                status: "error",
+                message: "Organization not found",
+            });
+        }
+
+        return res.status(200).json({
+            status: "success",
+            organization
+        });
+   } catch (error) {
+        console.error(error);
+
+        return res.status(500).json({
+            status: "error",
+            message: "Failed to retrieve organization",
+        });
+   }
 }

@@ -41,3 +41,26 @@ export async function createOrganization(
 
     return organization;
 }
+
+export async function getOrganizationById(
+    organizationId: string    
+) {
+    return prisma.organization.findUnique({
+        where: {
+            id: organizationId,
+        },
+        include: {
+            members: {
+                include: {
+                    user: {
+                        select: {
+                            id: true,
+                            name: true,
+                            email: true,
+                        },
+                    },
+                },
+            },
+        },
+    });
+}
