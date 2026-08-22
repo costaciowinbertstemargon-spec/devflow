@@ -1,14 +1,17 @@
 import express from "express";
 import cors from "cors";
 import { prisma } from "./config/database.js";
-import authRoutes from "./routes/auth.routes.js"
+import authRoutes from "./routes/auth.routes.js";
+import organizationRoutes from "./routes/organization.routes.js";
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
 
-app.use("/api/auth", authRoutes)
+app.use("/api/auth", authRoutes);
+
+app.use("/api/organizations", organizationRoutes);
 
 app.get("/api/health", async (_req, res) => {
     try {
