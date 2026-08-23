@@ -21,3 +21,29 @@ export async function createProject(
 
     return project;
 }
+
+export async function getProjectByOrganization(
+    organizationId: string
+) {
+    return prisma.project.findMany({
+        where: {
+            organizationId,
+        },
+        orderBy: {
+            createdAt: "desc",
+        },
+    });
+}
+
+export async function getProjectById(
+    projectId: string
+) {
+    return prisma.project.findUnique({
+        where: {
+            id: projectId,
+        },
+        include: {
+            organization: true,
+        },
+    });  
+}

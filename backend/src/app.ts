@@ -4,6 +4,7 @@ import { prisma } from "./config/database.js";
 import authRoutes from "./routes/auth.routes.js";
 import organizationRoutes from "./routes/organization.routes.js";
 import projectRoutes from "./routes/project.routes.js"
+import taskRoutes from "./routes/task.routes.js"
 
 const app = express();
 
@@ -15,6 +16,8 @@ app.use("/api/auth", authRoutes);
 app.use("/api/organizations", organizationRoutes);
 
 app.use("/api", projectRoutes);
+
+app.use("/api", taskRoutes);
 
 app.get("/api/health", async (_req, res) => {
     try {
