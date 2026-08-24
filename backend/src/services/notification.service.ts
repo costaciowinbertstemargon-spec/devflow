@@ -25,9 +25,6 @@ export async function createNotification(
         },
     });
 
-    console.log("NOTIFICATION INPUT:", input);
-    console.log("NOTIFICATION TARGET USER:", targetUser);
-
     if (!targetUser) {
         throw new Error("Notification target user does not exist");
     }
@@ -40,6 +37,45 @@ export async function createNotification(
             ...(input.taskId !== undefined && {
                 taskId: input.taskId,
             }),
+        },
+    });
+}
+
+export async function markNotificationAsRead(
+    notificationId: string,
+    userId: string
+) {
+    const notification = await prisma.notification.findFirst({
+        where: {
+            id: notificationId,
+            userId,
+        },
+    });
+    
+    if (!notification) {
+        throw new Error ("Notification not found");
+    }
+
+    return prisma.notification.update({
+        where: {
+            id: notificationId,
+        },
+        data: {
+            isRead: true,
+        },
+    });
+}
+
+export async function markAllNotificationsAsRead(
+    userId: string 
+) {
+    return prisma.notification.updateMany({
+        where: {
+            userId,
+            isRead: true,
+        },
+        data: {
+            isRead: true,
         },
     });
 }
