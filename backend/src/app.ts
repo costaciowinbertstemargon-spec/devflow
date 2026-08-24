@@ -3,8 +3,11 @@ import cors from "cors";
 import { prisma } from "./config/database.js";
 import authRoutes from "./routes/auth.routes.js";
 import organizationRoutes from "./routes/organization.routes.js";
-import projectRoutes from "./routes/project.routes.js"
-import taskRoutes from "./routes/task.routes.js"
+import projectRoutes from "./routes/project.routes.js";
+import taskRoutes from "./routes/task.routes.js";
+import commentRoutes from "./routes/comment.routes.js";
+import activityRoutes from "./routes/activity.routes.js";
+import notificationRoutes from "./routes/notification.routes.js";
 
 const app = express();
 
@@ -18,6 +21,12 @@ app.use("/api/organizations", organizationRoutes);
 app.use("/api", projectRoutes);
 
 app.use("/api", taskRoutes);
+
+app.use("/api", commentRoutes);
+
+app.use("/api", activityRoutes);
+
+app.use("/api", notificationRoutes);
 
 app.get("/api/health", async (_req, res) => {
     try {

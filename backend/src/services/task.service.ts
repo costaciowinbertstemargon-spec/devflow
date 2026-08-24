@@ -1,4 +1,5 @@
 import { prisma } from "../config/database.js";
+import { createNotification } from "./notification.service.js";
 
 interface CreateTaskInput {
     title: string;
@@ -98,6 +99,14 @@ export async function  createTask(
                     organizationId: true,
                 },
             },
+        },
+    });
+
+    await prisma.activity.create({
+        data: {
+            taskId: task.id,
+            userId,
+            action: "TASK_CREATED",
         },
     });
 
@@ -216,6 +225,107 @@ export async function updateTask(
             },
         },
     });
+ 
+    if (
+        input.status !== undefined &&
+        input.status !== existingTask?.status
+    ) {
+        await prisma.activity.create({
+            data: {
+                taskId,
+                userId,
+                action: "STATUS_CHANGED",
+                metadata: {
+                    from: existingTask?.status,
+                    to: input.status,
+                },
+            },
+        });
+    }
+
+    if (
+        input.priority !== undefined &&
+        input.priority !== existingTask?.priority
+    ) {
+        await prisma.activity.create({
+            data: {
+                taskId,
+                userId,
+                action: "PRIORITY_CHANGED",
+                metadata: {
+                    from: existingTask?.priority,
+                    to: input.priority,
+                },
+            },
+        });
+    }
+
+    if (
+        typeof input.assigneeId === "string" &&
+        input.assigneeId !== existingTask.assigneeId
+    ) {
+        const assignedUserId = input.assigneeId;
+
+        await prisma.activity.create({
+            data: {
+                taskId,
+                userId,
+                action: "TASK_ASSIGNED",
+                metadata: {
+                    from: existingTask.assigneeId,
+                    to: assignedUserId,
+                },
+            },
+        });
+
+        await createNotification({
+            userId: assignedUserId,
+            type: "TASK_ASSIGNED",
+            message: `You were assigned the task "${task.title}"`,
+            taskId: task.id,
+        });
+    }
+
+    const updatedFields: string[] = [];
+
+    if (
+        input.title !== undefined &&
+        input.title !== existingTask.title
+    ) {
+        updatedFields.push("title");
+    }
+
+    if (
+        input.description !== undefined &&
+        input.description !== existingTask.description
+    ) {
+        updatedFields.push("description");
+    }
+
+    if (
+        input.dueDate !== undefined
+    ) {
+        const oldDueDate = existingTask.dueDate
+            ? existingTask.dueDate.toISOString()
+            : null;
+
+        if (input.dueDate !== oldDueDate) {
+            updatedFields.push("dueDate");
+        }
+    }
+
+    if (updatedFields.length > 0) {
+        await prisma.activity.create({
+            data: {
+                taskId,
+                userId,
+                action: "TASK_UPDATED",
+                metadata: {
+                    updatedFields,
+                },
+            },
+        });
+    }
 
     return task;
 }
