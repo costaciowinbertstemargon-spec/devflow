@@ -1,5 +1,6 @@
 import { prisma } from "../config/database.js";
 import { createNotification } from "./notification.service.js";
+import { getIO } from "../config/socket.js";
 
 interface CreateTaskInput {
     title: string;
@@ -225,6 +226,15 @@ export async function updateTask(
             },
         },
     });
+
+    const io = getIO();
+
+    io.to(`organization:${task.project.organizationId}`).emit(
+        "task:updated",
+        {
+            task,
+        }
+    );
  
     if (
         input.status !== undefined &&

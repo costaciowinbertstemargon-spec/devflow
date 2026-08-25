@@ -1,4 +1,5 @@
 import { prisma } from "../config/database.js";
+import { getIO } from "../config/socket.js";
 
 interface CreateNotificationInput {
     userId: string;
@@ -29,7 +30,7 @@ export async function createNotification(
         throw new Error("Notification target user does not exist");
     }
 
-    return prisma.notification.create({
+    const notification = await prisma.notification.create({
         data: {
             userId: targetUser.id,
             type: input.type,
@@ -39,6 +40,17 @@ export async function createNotification(
             }),
         },
     });
+
+    const io = getIO();
+
+    io.to(`user:${notification.userId}`).emit(
+        "notification:new",
+        {
+            notification,
+        }
+    );
+
+    return notification;
 }
 
 export async function markNotificationAsRead(
