@@ -33,40 +33,6 @@ export async function createTaskController(
             assigneeId,
         } = req.body;
 
-        if (!title || typeof title !== "string") {
-            return res.status(400).json({
-                status: "error",
-                message: "Task title is required",
-            });
-        }
-
-        const validPriorities = [
-            "LOW",
-            "MEDIUM",
-            "HIGH",
-            "URGENT",
-        ];
-        
-        if (
-            priority !== undefined &&
-            !validPriorities.includes(priority)
-        ) {
-            return res.status(400).json({
-                status: "error",
-                message: "Invalid task priotity",
-            });
-        }
-
-        if (
-            dueDate !== undefined &&
-            Number.isNaN(Date.parse(dueDate))
-        ) {
-            return res.status(400).json({
-                status: "error",
-                message: "Invalid due date"
-            });
-        }
-
         const task = await createTask(
             projectId,
             req.user.userId,
@@ -79,7 +45,7 @@ export async function createTaskController(
             }
         );
 
-        return res.status(200).json({
+        return res.status(201).json({
             status: "success",
             message: "Task created successfully",
             task,
@@ -116,7 +82,7 @@ export async function createTaskController(
 
 export async function updateTaskController(
     req: AuthenticatedRequest,
-    res: Response    
+    res: Response
 ) {
     try {
         if (!req.user) {
@@ -128,7 +94,7 @@ export async function updateTaskController(
 
         const taskId = req.params.taskId;
 
-        if(typeof taskId !== "string") {
+        if (typeof taskId !== "string") {
             return res.status(400).json({
                 status: "error",
                 message: "Invalid task ID",
@@ -136,72 +102,13 @@ export async function updateTaskController(
         }
 
         const {
-            title, 
-            description, 
+            title,
+            description,
             status,
-            priority, 
-            dueDate, 
-            createdAt, 
+            priority,
+            dueDate,
             assigneeId,
         } = req.body;
-
-        const validStatuses = [
-            "TODO",
-            "IN_PROGRESS",
-            "REVIEW",
-            "DONE",
-        ];
-
-            const validPriorities = [
-            "LOW",
-            "MEDIUM",
-            "HIGH",
-            "URGENT",
-        ];
-
-        if (
-            status !== undefined &&
-            !validStatuses.includes(status)
-        ) {
-            return res.status(400).json({
-                status: "error",
-                message: "Invalid task status",
-            });
-        }
-
-        if (
-            priority !== undefined &&
-            !validPriorities.includes(priority)
-        ) {
-            return res.status(400).json({
-                status: "error",
-                message: "Invalid task priority",
-            });
-        }
-
-        if (
-            title !== undefined &&
-            typeof title !== "string"
-        ) {
-            return res.status(400).json({
-                status: "error",
-                message: "Invalid task title",
-            });
-        }
-
-        if (
-            dueDate !== undefined &&
-            dueDate !== null &&
-            (
-                typeof dueDate !== "string" ||
-                Number.isNaN(Date.parse(dueDate))
-            )
-        ) {
-            return res.status(400).json({
-                status: "error",
-                message: "Invalid due date"
-            });
-        }
 
         const task = await updateTask(
             taskId,
@@ -234,11 +141,12 @@ export async function updateTaskController(
 
         if (
             error instanceof Error &&
-            error.message === "You are not a member of this organization"
+            error.message ===
+                "You are not a member of this organization"
         ) {
             return res.status(403).json({
                 status: "error",
-                message: error.message
+                message: error.message,
             });
         }
 
@@ -254,7 +162,8 @@ export async function updateTaskController(
 
         if (
             error instanceof Error &&
-            error.message === "Assignee is not a member of the project organization"
+            error.message ===
+                "Assignee is not a member of the project organization"
         ) {
             return res.status(400).json({
                 status: "error",

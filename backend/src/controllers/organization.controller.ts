@@ -1,8 +1,7 @@
 import type { Response } from "express";
 import type { AuthenticatedRequest } from "../middleware/auth.middleware.js";
-import { createOrganization } from "../services/organization.service.js";
+import { createOrganization, getOrganizationById } from "../services/organization.service.js";
 import { addOrganizationMember } from "../services/organization_member.service.js";
-import { getOrganizationById } from "../services/organization.service.js";
 import type { OrganizationRequest } from "../middleware/organization.middleware.js";
 
 export async function createOrganizationController(
@@ -18,13 +17,6 @@ export async function createOrganizationController(
         }
 
         const { name, description } = req.body
-
-        if (!name || typeof name !== "string") {
-            return res.status(400).json({
-                status: "error",
-                message: "Organization name is required",
-            });
-        }
 
         const organization = await createOrganization (
             {
@@ -71,20 +63,6 @@ export async function addMember(
         }
 
         const { email, role } = req.body;
-
-        if (!email || typeof email !== "string") {
-            return res.status(400).json({
-                status: "error",
-                message: "Email is required",
-            });
-        }
-
-        if (role !== "ADMIN" && role !== "MEMBER") {
-            return res.status(400).json({
-                status: "error",
-                message: "Role must be ADMIN or MEMBER",
-            });
-        }
 
         const membership = await addOrganizationMember(
             organizationId,

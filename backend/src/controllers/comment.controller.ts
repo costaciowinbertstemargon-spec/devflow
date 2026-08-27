@@ -25,17 +25,6 @@ export async function createCommentController(
 
         const { content } = req.body;
 
-        if (
-            !content ||
-            typeof content !== "string" ||
-            content.trim().length === 0
-        ) {
-            return res.status(400).json({
-                status: "error",
-                message: "Comment content is required",
-            });
-        }
-
         const comment = await createComment(
             taskId,
             req.user.userId,
@@ -54,10 +43,20 @@ export async function createCommentController(
             error instanceof Error &&
             error.message === "Task not found"
         ) {
-            return res.status(403).json({
+            return res.status(404).json({
                 status: "error",
                 message: error.message,
             })
+        }
+
+        if (
+            error instanceof Error &&
+            error.message === "You are not a member of this organization"
+        ) {
+            return res.status(403).json({
+                status: "error",
+                message: error.message,
+            });
         }
         
         console.error(error);

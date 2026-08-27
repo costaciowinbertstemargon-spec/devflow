@@ -18,13 +18,6 @@ export async function createProjectController(
 
         const { name, description } = req.body;
 
-        if (!name || typeof name !== "string") {
-            return res.status(400).json({
-                status: "error",
-                message: "Project name is required",
-            });
-        }
-
         const project = await createProject(
             req.organization.id,
             {
@@ -56,7 +49,7 @@ export async function getProjects(
         if (!req.organization) {
             return res.status(403).json({
                 status: "error",
-                message: "Organization acess required",
+                message: "Organization access required",
             });
         }
 
