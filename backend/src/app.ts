@@ -1,5 +1,7 @@
 import express from "express";
 import cors from "cors";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
 import { prisma } from "./config/database.js";
 import authRoutes from "./routes/auth.routes.js";
 import organizationRoutes from "./routes/organization.routes.js";
@@ -11,10 +13,26 @@ import notificationRoutes from "./routes/notification.routes.js";
 
 const app = express();
 
-app.use(cors());
-app.use(express.json());
+const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: process.env.NODE_ENV === "test" ? 1000 : 10,
+    standardHeaders: "draft-8",
+    legacyHeaders: false,
+    message: {
+        status: "error",
+        message: "Too many authentication attempts. Please try again later.",
+    },
+});
 
-app.use("/api/auth", authRoutes);
+app.use(
+    cors({
+        origin: "http://localhost:3000",
+        credentials: true,
+    })
+);
+app.use(express.json());
+app.use(helmet());
+app.use("/api/auth", authLimiter, authRoutes);
 
 app.use("/api/organizations", organizationRoutes);
 

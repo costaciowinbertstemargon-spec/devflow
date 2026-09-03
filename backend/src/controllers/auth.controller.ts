@@ -37,7 +37,7 @@ export async function register(
             });
         }
 
-        console.log (error);
+        console.error(error);
 
         return res.status(500).json({
             status: "error",
