@@ -84,7 +84,7 @@ export async function markAllNotificationsAsRead(
     return prisma.notification.updateMany({
         where: {
             userId,
-            isRead: true,
+            isRead: false,
         },
         data: {
             isRead: true,

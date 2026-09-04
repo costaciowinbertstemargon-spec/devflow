@@ -65,7 +65,7 @@ export async function createTaskController(
             error instanceof Error &&
             error.message === "Assignee is not a member of the project organization"
         ) {
-            return res.status(400).json({
+            return res.status(403).json({
                 status: "error",
                 message: error.message,
             });
@@ -165,7 +165,7 @@ export async function updateTaskController(
             error.message ===
                 "Assignee is not a member of the project organization"
         ) {
-            return res.status(400).json({
+            return res.status(403).json({
                 status: "error",
                 message: error.message,
             });

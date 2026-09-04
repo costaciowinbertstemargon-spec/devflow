@@ -172,7 +172,7 @@ export async function updateTask(
         
         if (!assigneeMembership) {
             throw new Error(
-                "Assignee is not a member of the prohect organization"
+                "Assignee is not a member of the project organization"
             );
         }
     }

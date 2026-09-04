@@ -520,4 +520,554 @@ describe("Tasks API", () => {
 
         expect(updateResponse.status).toBe(403);
     });
+
+    it("should create a notification when a task is assigned", async () => {
+        const ownerEmail = `assign-owner-${Date.now()}@example.com`;
+        const assigneeEmail = `assign-user-${Date.now()}@example.com`;
+        const password = "password123";
+
+        // Register owner
+        await request(app)
+            .post("/api/auth/register")
+            .send({
+            name: "Assignment Owner",
+            email: ownerEmail,
+            password,
+            });
+
+        // Register assignee
+        const assigneeRegister = await request(app)
+            .post("/api/auth/register")
+            .send({
+            name: "Assignment User",
+            email: assigneeEmail,
+            password,
+            });
+
+        expect(assigneeRegister.status).toBe(201);
+
+        const assigneeId = assigneeRegister.body.user.id;
+
+        // Login owner
+        const ownerLogin = await request(app)
+            .post("/api/auth/login")
+            .send({
+            email: ownerEmail,
+            password,
+            });
+
+        expect(ownerLogin.status).toBe(200);
+
+        const ownerToken = ownerLogin.body.token;
+
+        // Login assignee
+        const assigneeLogin = await request(app)
+            .post("/api/auth/login")
+            .send({
+            email: assigneeEmail,
+            password,
+            });
+
+        expect(assigneeLogin.status).toBe(200);
+
+        const assigneeToken = assigneeLogin.body.token;
+
+        // Create organization
+        const organizationResponse = await request(app)
+            .post("/api/organizations")
+            .set("Authorization", `Bearer ${ownerToken}`)
+            .send({
+            name: `Assignment Organization ${Date.now()}`,
+            description: "Testing task assignment notifications",
+            });
+
+        expect(organizationResponse.status).toBe(201);
+
+        const organizationId = organizationResponse.body.organization.id;
+
+        // Add assignee to organization
+        const memberResponse = await request(app)
+            .post(`/api/organizations/${organizationId}/members`)
+            .set("Authorization", `Bearer ${ownerToken}`)
+            .send({
+            email: assigneeEmail,
+            role: "MEMBER",
+            });
+
+        expect(memberResponse.status).toBe(201);
+
+        // Create project
+        const projectResponse = await request(app)
+            .post(`/api/organizations/${organizationId}/projects`)
+            .set("Authorization", `Bearer ${ownerToken}`)
+            .send({
+            name: "Assignment Project",
+            description: "Testing task assignment notifications",
+            });
+
+        expect(projectResponse.status).toBe(201);
+
+        const projectId = projectResponse.body.project.id;
+
+        // Create task
+        const taskResponse = await request(app)
+            .post(`/api/projects/${projectId}/tasks`)
+            .set("Authorization", `Bearer ${ownerToken}`)
+            .send({
+            title: "Assignment Test Task",
+            description: "Testing task assignment notification",
+            priority: "HIGH",
+            });
+
+        expect(taskResponse.status).toBe(201);
+
+        const taskId = taskResponse.body.task.id;
+
+        // Assign task
+        const updateResponse = await request(app)
+            .patch(`/api/tasks/${taskId}`)
+            .set("Authorization", `Bearer ${ownerToken}`)
+            .send({
+            assigneeId,
+            });
+
+        expect(updateResponse.status).toBe(200);
+
+        // Check assignee notifications
+        const notificationsResponse = await request(app)
+            .get("/api/notifications")
+            .set("Authorization", `Bearer ${assigneeToken}`);
+
+        expect(notificationsResponse.status).toBe(200);
+
+        const notifications = notificationsResponse.body.notifications;
+
+        expect(notifications.length).toBeGreaterThan(0);
+
+        const assignmentNotification = notifications.find(
+            (notification: { type: string; taskId?: string }) =>
+            notification.type === "TASK_ASSIGNED" &&
+            notification.taskId === taskId
+        );
+
+        expect(assignmentNotification).toBeDefined();
+        expect(assignmentNotification.isRead).toBe(false);
+    });
+
+    it("should reject assigning a task to a user outside the organization", async () => {
+        const ownerEmail = `assign-owner-${Date.now()}@example.com`;
+        const outsiderEmail = `assign-outsider-${Date.now()}@example.com`;
+        const password = "password123";
+
+        // Register owner
+        await request(app)
+            .post("/api/auth/register")
+            .send({
+            name: "Assignment Owner",
+            email: ownerEmail,
+            password,
+            });
+
+        // Register outsider
+        const outsiderRegister = await request(app)
+            .post("/api/auth/register")
+            .send({
+            name: "Assignment Outsider",
+            email: outsiderEmail,
+            password,
+            });
+
+        expect(outsiderRegister.status).toBe(201);
+
+        const outsiderId = outsiderRegister.body.user.id;
+
+        // Login owner
+        const ownerLogin = await request(app)
+            .post("/api/auth/login")
+            .send({
+            email: ownerEmail,
+            password,
+            });
+
+        expect(ownerLogin.status).toBe(200);
+
+        const ownerToken = ownerLogin.body.token;
+
+        // Create organization
+        const organizationResponse = await request(app)
+            .post("/api/organizations")
+            .set("Authorization", `Bearer ${ownerToken}`)
+            .send({
+            name: `Assignment Security Organization ${Date.now()}`,
+            description: "Testing assignment authorization",
+            });
+
+        expect(organizationResponse.status).toBe(201);
+
+        const organizationId = organizationResponse.body.organization.id;
+
+        // Create project
+        const projectResponse = await request(app)
+            .post(`/api/organizations/${organizationId}/projects`)
+            .set("Authorization", `Bearer ${ownerToken}`)
+            .send({
+            name: "Assignment Security Project",
+            description: "Testing assignment authorization",
+            });
+
+        expect(projectResponse.status).toBe(201);
+
+        const projectId = projectResponse.body.project.id;
+
+        // Create task
+        const taskResponse = await request(app)
+            .post(`/api/projects/${projectId}/tasks`)
+            .set("Authorization", `Bearer ${ownerToken}`)
+            .send({
+            title: "Assignment Security Task",
+            description: "Testing invalid task assignment",
+            priority: "MEDIUM",
+            });
+
+        expect(taskResponse.status).toBe(201);
+
+        const taskId = taskResponse.body.task.id;
+
+        // Try to assign task to non-member
+        const updateResponse = await request(app)
+            .patch(`/api/tasks/${taskId}`)
+            .set("Authorization", `Bearer ${ownerToken}`)
+            .send({
+            assigneeId: outsiderId,
+            });
+
+        expect(updateResponse.status).toBe(403);
+    });
+
+    it("should unassign an existing task", async () => {
+        const email = `unassign-${Date.now()}@example.com`;
+        const password = "password123";
+
+        // Register
+        await request(app)
+            .post("/api/auth/register")
+            .send({
+            name: "Unassign Test User",
+            email,
+            password,
+            });
+
+        // Login
+        const loginResponse = await request(app)
+            .post("/api/auth/login")
+            .send({
+            email,
+            password,
+            });
+
+        expect(loginResponse.status).toBe(200);
+
+        const token = loginResponse.body.token;
+
+        // Create organization
+        const organizationResponse = await request(app)
+            .post("/api/organizations")
+            .set("Authorization", `Bearer ${token}`)
+            .send({
+            name: `Unassign Organization ${Date.now()}`,
+            description: "Testing task unassignment",
+            });
+
+        expect(organizationResponse.status).toBe(201);
+
+        const organizationId = organizationResponse.body.organization.id;
+
+        // Create project
+        const projectResponse = await request(app)
+            .post(`/api/organizations/${organizationId}/projects`)
+            .set("Authorization", `Bearer ${token}`)
+            .send({
+            name: "Unassign Project",
+            description: "Testing task unassignment",
+            });
+
+        expect(projectResponse.status).toBe(201);
+
+        const projectId = projectResponse.body.project.id;
+
+        // Create task assigned to the current user
+        const taskResponse = await request(app)
+            .post(`/api/projects/${projectId}/tasks`)
+            .set("Authorization", `Bearer ${token}`)
+            .send({
+            title: "Unassign Test Task",
+            description: "Testing task unassignment",
+            priority: "MEDIUM",
+            assigneeId: loginResponse.body.user.id,
+            });
+
+        expect(taskResponse.status).toBe(201);
+
+        const taskId = taskResponse.body.task.id;
+
+        // Unassign task
+        const updateResponse = await request(app)
+            .patch(`/api/tasks/${taskId}`)
+            .set("Authorization", `Bearer ${token}`)
+            .send({
+            assigneeId: null,
+            });
+
+        expect(updateResponse.status).toBe(200);
+        expect(updateResponse.body.status).toBe("success");
+        expect(updateResponse.body.task.assigneeId).toBeNull();
+    });
+
+    it("should update only the task status", async () => {
+        const email = `status-only-${Date.now()}@example.com`;
+        const password = "password123";
+
+        // Register
+        await request(app)
+            .post("/api/auth/register")
+            .send({
+            name: "Status Test User",
+            email,
+            password,
+            });
+
+        // Login
+        const loginResponse = await request(app)
+            .post("/api/auth/login")
+            .send({
+            email,
+            password,
+            });
+
+        expect(loginResponse.status).toBe(200);
+
+        const token = loginResponse.body.token;
+        const userId = loginResponse.body.user.id;
+
+        // Create organization
+        const organizationResponse = await request(app)
+            .post("/api/organizations")
+            .set("Authorization", `Bearer ${token}`)
+            .send({
+            name: `Status Organization ${Date.now()}`,
+            description: "Testing status updates",
+            });
+
+        expect(organizationResponse.status).toBe(201);
+
+        const organizationId = organizationResponse.body.organization.id;
+
+        // Create project
+        const projectResponse = await request(app)
+            .post(`/api/organizations/${organizationId}/projects`)
+            .set("Authorization", `Bearer ${token}`)
+            .send({
+            name: "Status Project",
+            description: "Testing status updates",
+            });
+
+        expect(projectResponse.status).toBe(201);
+
+        const projectId = projectResponse.body.project.id;
+
+        // Create task
+        const taskResponse = await request(app)
+            .post(`/api/projects/${projectId}/tasks`)
+            .set("Authorization", `Bearer ${token}`)
+            .send({
+            title: "Status Test Task",
+            description: "Status update test",
+            priority: "LOW",
+            assigneeId: userId,
+            });
+
+        expect(taskResponse.status).toBe(201);
+
+        const taskId = taskResponse.body.task.id;
+
+        // Update only status
+        const updateResponse = await request(app)
+            .patch(`/api/tasks/${taskId}`)
+            .set("Authorization", `Bearer ${token}`)
+            .send({
+            status: "DONE",
+            });
+
+        expect(updateResponse.status).toBe(200);
+        expect(updateResponse.body.status).toBe("success");
+        expect(updateResponse.body.task.status).toBe("DONE");
+        expect(updateResponse.body.task.title).toBe("Status Test Task");
+        expect(updateResponse.body.task.priority).toBe("LOW");
+    });
+
+    it("should update only the task priority", async () => {
+        const email = `priority-only-${Date.now()}@example.com`;
+        const password = "password123";
+
+        // Register
+        await request(app)
+            .post("/api/auth/register")
+            .send({
+            name: "Priority Test User",
+            email,
+            password,
+            });
+
+        // Login
+        const loginResponse = await request(app)
+            .post("/api/auth/login")
+            .send({
+            email,
+            password,
+            });
+
+        expect(loginResponse.status).toBe(200);
+
+        const token = loginResponse.body.token;
+
+        // Create organization
+        const organizationResponse = await request(app)
+            .post("/api/organizations")
+            .set("Authorization", `Bearer ${token}`)
+            .send({
+            name: `Priority Organization ${Date.now()}`,
+            description: "Testing priority updates",
+            });
+
+        expect(organizationResponse.status).toBe(201);
+
+        const organizationId = organizationResponse.body.organization.id;
+
+        // Create project
+        const projectResponse = await request(app)
+            .post(`/api/organizations/${organizationId}/projects`)
+            .set("Authorization", `Bearer ${token}`)
+            .send({
+            name: "Priority Project",
+            description: "Testing priority updates",
+            });
+
+        expect(projectResponse.status).toBe(201);
+
+        const projectId = projectResponse.body.project.id;
+
+        // Create task
+        const taskResponse = await request(app)
+            .post(`/api/projects/${projectId}/tasks`)
+            .set("Authorization", `Bearer ${token}`)
+            .send({
+            title: "Priority Test Task",
+            description: "Priority update test",
+            priority: "LOW",
+            });
+
+        expect(taskResponse.status).toBe(201);
+
+        const taskId = taskResponse.body.task.id;
+
+        // Update only priority
+        const updateResponse = await request(app)
+            .patch(`/api/tasks/${taskId}`)
+            .set("Authorization", `Bearer ${token}`)
+            .send({
+            priority: "URGENT",
+            });
+
+        expect(updateResponse.status).toBe(200);
+        expect(updateResponse.body.status).toBe("success");
+        expect(updateResponse.body.task.priority).toBe("URGENT");
+        expect(updateResponse.body.task.title).toBe("Priority Test Task");
+        expect(updateResponse.body.task.description).toBe("Priority update test");
+    });
+
+    it("should update only the task due date", async () => {
+        const email = `duedate-only-${Date.now()}@example.com`;
+        const password = "password123";
+
+        // Register
+        await request(app)
+            .post("/api/auth/register")
+            .send({
+            name: "Due Date Test User",
+            email,
+            password,
+            });
+
+        // Login
+        const loginResponse = await request(app)
+            .post("/api/auth/login")
+            .send({
+            email,
+            password,
+            });
+
+        expect(loginResponse.status).toBe(200);
+
+        const token = loginResponse.body.token;
+
+        // Create organization
+        const organizationResponse = await request(app)
+            .post("/api/organizations")
+            .set("Authorization", `Bearer ${token}`)
+            .send({
+            name: `Due Date Organization ${Date.now()}`,
+            description: "Testing due date updates",
+            });
+
+        expect(organizationResponse.status).toBe(201);
+
+        const organizationId = organizationResponse.body.organization.id;
+
+        // Create project
+        const projectResponse = await request(app)
+            .post(`/api/organizations/${organizationId}/projects`)
+            .set("Authorization", `Bearer ${token}`)
+            .send({
+            name: "Due Date Project",
+            description: "Testing due date updates",
+            });
+
+        expect(projectResponse.status).toBe(201);
+
+        const projectId = projectResponse.body.project.id;
+
+        // Create task
+        const taskResponse = await request(app)
+            .post(`/api/projects/${projectId}/tasks`)
+            .set("Authorization", `Bearer ${token}`)
+            .send({
+            title: "Due Date Test Task",
+            description: "Due date update test",
+            priority: "MEDIUM",
+            });
+
+        expect(taskResponse.status).toBe(201);
+
+        const taskId = taskResponse.body.task.id;
+
+        // Update only due date
+        const dueDate = "2026-12-31T23:59:59.000Z";
+
+        const updateResponse = await request(app)
+            .patch(`/api/tasks/${taskId}`)
+            .set("Authorization", `Bearer ${token}`)
+            .send({
+            dueDate,
+            });
+
+        expect(updateResponse.status).toBe(200);
+        expect(updateResponse.body.status).toBe("success");
+        expect(updateResponse.body.task.title).toBe("Due Date Test Task");
+        expect(updateResponse.body.task.description).toBe("Due date update test");
+        expect(updateResponse.body.task.priority).toBe("MEDIUM");
+
+        expect(
+            new Date(updateResponse.body.task.dueDate).toISOString()
+        ).toBe(dueDate);
+    });
 });
