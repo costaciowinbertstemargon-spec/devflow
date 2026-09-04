@@ -654,4 +654,46 @@ describe("Notifications API", () => {
             expect(ownerNotificationIds).not.toContain(notificationId);
         }
     });
+
+    it("should return 404 when the notification does not exist", async () => {
+        const email = `notification-not-found-${Date.now()}@example.com`;
+        const password = "password123";
+
+        // Register
+        await request(app)
+            .post("/api/auth/register")
+            .send({
+            name: "Notification Not Found User",
+            email,
+            password,
+            });
+
+        // Login
+        const loginResponse = await request(app)
+            .post("/api/auth/login")
+            .send({
+            email,
+            password,
+            });
+
+        expect(loginResponse.status).toBe(200);
+
+        const token = loginResponse.body.token;
+
+        const fakeNotificationId =
+            "00000000-0000-0000-0000-000000000000";
+
+        const response = await request(app)
+            .patch(`/api/notifications/${fakeNotificationId}/read`)
+            .set("Authorization", `Bearer ${token}`);
+
+        expect(response.status).toBe(404);
+    });
+
+    it("should reject marking all notifications as read without authentication", async () => {
+        const response = await request(app)
+            .patch("/api/notifications/read-all");
+
+        expect(response.status).toBe(401);
+    });
 });
