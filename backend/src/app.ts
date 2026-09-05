@@ -10,6 +10,7 @@ import taskRoutes from "./routes/task.routes.js";
 import commentRoutes from "./routes/comment.routes.js";
 import activityRoutes from "./routes/activity.routes.js";
 import notificationRoutes from "./routes/notification.routes.js";
+import { errorHandler } from "./middleware/error.middleware.js";
 
 const app = express();
 
@@ -51,8 +52,9 @@ app.get("/api/health", async (_req, res) => {
         await prisma.user.count();
 
         res.json({
-            status: "ok",
-            message: "DevFlow API and database are running",
+            status: "success",
+            message: "DevFlow API is healthy",
+            database: "connected",
         });
     } catch (error) {
         console.error(error);
@@ -63,5 +65,14 @@ app.get("/api/health", async (_req, res) => {
         });
     }
 });
+
+app.use((_req, res) => {
+    res.status(404).json({
+        status: "error",
+        message: "Route not found",
+    });
+});
+
+app.use(errorHandler);
 
 export default app;

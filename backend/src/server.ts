@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { env } from "./config/env.js";
 import { createServer } from "node:http";
 import { Server } from "socket.io";
 import app from "./app.js";
@@ -6,7 +7,7 @@ import { initializeSocket } from "./config/socket.js";
 import jwt from "jsonwebtoken";
 import { prisma } from "./config/database.js";
 
-const PORT = process.env.PORT || 5000;
+const PORT = env.port;
 
 const httpServer = createServer(app);
 
@@ -27,7 +28,7 @@ io.use((socket, next) => {
             return next(new Error("Authentication required"));
         }
 
-        const secret = process.env.JWT_SECRET;
+        const secret = env.jwtSecret;
 
         if (!secret) {
             return next(new Error("JWT_SECRET is not configured"));
@@ -116,4 +117,28 @@ httpServer.listen(PORT, () => {
     console.log(
         `DevFlow API running on http://localhost:${PORT}`
     );
+});
+
+const gracefulShutdown = async (signal: string) => {
+    console.log(`Received ${signal}. Closing server...`);
+
+    httpServer.close(async () => {
+        try {
+            await prisma.$disconnect();
+            console.log("Database connection closed.");
+
+            process.exit(0);
+        } catch (error) {
+            console.error("Error during shutdown:", error);
+            process.exit(1);
+        }
+    });
+};
+
+process.on("SIGTERM", () => {
+    void gracefulShutdown("SIGTERM");
+});
+
+process.on("SIGINT", () => {
+    void gracefulShutdown("SIGINT");
 });
