@@ -11,6 +11,9 @@ import commentRoutes from "./routes/comment.routes.js";
 import activityRoutes from "./routes/activity.routes.js";
 import notificationRoutes from "./routes/notification.routes.js";
 import { errorHandler } from "./middleware/error.middleware.js";
+import swaggerUi from "swagger-ui-express";
+import { swaggerDocument } from "./config/swagger.js";
+import { env } from "./config/env.js";
 
 const app = express();
 
@@ -27,12 +30,19 @@ const authLimiter = rateLimit({
 
 app.use(
     cors({
-        origin: "http://localhost:3000",
+        origin: env.frontendUrl,
         credentials: true,
     })
 );
 app.use(express.json());
 app.use(helmet());
+
+app.use(
+    "/api/docs", 
+    swaggerUi.serve, 
+    swaggerUi.setup(swaggerDocument)
+);
+
 app.use("/api/auth", authLimiter, authRoutes);
 
 app.use("/api/organizations", organizationRoutes);

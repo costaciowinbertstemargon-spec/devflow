@@ -2,6 +2,7 @@ import bcrypt from "bcrypt";
 import jwt, { type SignOptions } from "jsonwebtoken";
 import { prisma } from "../config/database.js";
 import type { RegisterInput, LoginInput } from "../utils/auth.validation.js";
+import { env } from "../config/env.js";
 
 export async function registerUser(input: RegisterInput) {
     const existingUser = await prisma.user.findUnique({
@@ -52,23 +53,15 @@ export async function loginUser(input: LoginInput) {
         throw new Error("Invalid email or password");
     }
 
-    const secret = process.env.JWT_SECRET;
-
-    if (!secret) {
-        throw new Error("JWT_SECRET is not configured");
-    }
-
-    const expiresIn: SignOptions["expiresIn"] =
-    (process.env.JWT_EXPIRES_IN as SignOptions["expiresIn"]) || "1h";
-
     const token = jwt.sign(
         {
             userId: user.id,
             email: user.email,
         },
-        secret,
+        env.jwtSecret,
         {
-            expiresIn,
+            expiresIn: env.jwtExpirationIn,
+            algorithm: "HS256",
         }
     );
 

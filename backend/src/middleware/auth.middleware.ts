@@ -1,5 +1,6 @@
 import type { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
+import { env } from "../config/env.js";
 
 export interface AuthenticatedRequest extends Request {
     user?: {
@@ -33,18 +34,13 @@ export function authenticate(
             });
         }
 
-        const secret = process.env.JWT_SECRET;
-
-        if (!secret) {
-            console.error("JWT_SECRET is not configured");
-
-            return res.status(500).json({
-                status: "error",
-                message: "Server configuration error",
-            });
-        }
-
-        const decoded = jwt.verify(token,secret);
+        const decoded = jwt.verify(
+            token,
+            env.jwtSecret,
+            {
+                algorithms: ["HS256"],
+            }
+        );
 
         if (typeof decoded !== "object" || !decoded) {
             return res.status(401).json({
