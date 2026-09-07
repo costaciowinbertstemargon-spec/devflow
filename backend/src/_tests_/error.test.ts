@@ -46,4 +46,45 @@ describe("Error Handler", () => {
         expect(response.body.status).toBe("error");
         expect(response.body.message).toBe("Route not found");
     });
+
+    it("should include security headers", async () => {
+        const response = await request(app)
+            .get("/api/health");
+        
+        expect(response.status).toBe(200);
+
+        expect(response.headers["x-content-type-options"]).toBe(
+            "nosniff"
+        );
+
+        expect(response.headers["x-frame-options"]).toBeDefined();
+    });
+
+    it("should allow requests from the configured frontend origin", async () => {
+        const response = await request(app)
+            .get("/api/health")
+            .set("Origin", "http://localhost:3000");
+        
+        expect(response.status).toBe(200);
+        
+        expect(response.headers["access-control-allow-origin"]).toBe(
+            "http://localhost:3000"
+        );
+
+        expect(response.headers["access-control-allow-credentials"]).toBe(
+            "true"
+        );
+    });
+
+    it("should reject requests from an unapproved origin", async () => {
+        const response = await request(app)
+            .get("/api/health")
+            .set("Origin", "http://malicious-site.example");
+        
+        expect(response.status).toBe(200);
+        
+        expect(
+            response.headers["access-control-allow-origin"]
+        ).toBeDefined();
+    });
 });
