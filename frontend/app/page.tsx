@@ -1,5 +1,5 @@
-import SocketTest from "@/components/SocketTest";
+import { redirect } from "next/navigation";
 
 export default function Home() {
-  return <SocketTest />;
+    redirect("/dashboard");
 }
