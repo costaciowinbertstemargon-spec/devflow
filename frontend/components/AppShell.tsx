@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
+import { useAuth } from "./AuthProvider";
 
 const navigation = [
     {
@@ -45,6 +46,7 @@ export default function AppShell({
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const router = useRouter();
     const pathname = usePathname();
+    const { user, logout } = useAuth();
 
     return (
         <div className="min-h-screen bg-[var(--background)] text-[var(--text-primary)]">
@@ -166,6 +168,7 @@ export default function AppShell({
 
                     <button
                         type="button"
+                        onClick={logout}
                         className="mt-1 flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition hover:bg-[var(--surface-subtle)]"
                     >
                         <UserCircle
@@ -175,11 +178,11 @@ export default function AppShell({
 
                         <div className="min-w-0">
                             <p className="truncate text-sm font-semibold">
-                                Your Account
+                                {user?.name ?? "Loading..."}
                             </p>
 
                             <p className="truncate text-xs text-[var(--text-muted)]">
-                                user@devflow.local
+                                {user?.email ?? ""}
                             </p>
                         </div>
                     </button>
