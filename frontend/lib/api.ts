@@ -6,6 +6,8 @@ interface ApiResponse<T> {
     [key: string]: unknown;
 }
 
+{/* Get Project */}
+
 export interface Project {
     id: string;
     name: string;
@@ -45,6 +47,42 @@ export async function getProjects(
     }
 
     return data.projects;
+}
+
+export async function getProject(
+    projectId: string,
+    token: string
+): Promise<Project> {
+    const response = await fetch(
+        `${API_URL}/projects/${projectId}`,
+        {
+            method: "GET",
+            headers: {
+                Authorization: `Bearer ${token}`,
+            },
+            cache: "no-store",
+        }
+    );
+
+    const data =
+        (await response.json()) as {
+            status?: string;
+            message?: string;
+            project?: Project;
+        };
+
+    if (!response.ok) {
+        throw new Error(
+            data.message ||
+                "Failed to load project"
+        );
+    }
+
+    if (!data.project) {
+        throw new Error("Project data was not returned.");
+    }
+
+    return data.project;
 }
 
 {/* Login */}
@@ -168,4 +206,100 @@ export async function getOrganizations(
     }
 
     return data.organizations;
+}
+
+{/* Creating Projects */}
+
+export interface CreateProjectResponse {
+    status: string;
+    message?: string;
+    project: Project;
+}
+
+export async function createProject(
+    organizationId: string,
+    token: string,
+    name: string,
+    description?: string
+): Promise<Project> {
+    const response = await fetch(
+        `${API_URL}/organizations/${organizationId}/projects`,
+        {
+            method: "POST",
+            headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                name,
+                ...(description?.trim()
+                    ? {
+                          description: description.trim(),
+                      }
+                    : {}),
+            }),
+            cache: "no-store",
+        }
+    );
+
+    const data =
+        (await response.json()) as CreateProjectResponse;
+
+    if (!response.ok) {
+        throw new Error(
+            data.message ||
+                "Failed to create project"
+        );
+    }
+
+    return data.project;
+}
+
+{/* Getting Tasks */}
+
+export interface TasksResponse {
+    status: string;
+    tasks: Task[];
+}
+
+export interface Task {
+    id: string;
+    title: string;
+    description: string | null;
+    status: string;
+    priority: string;
+    dueDate: string | null;
+    assigneeId: string | null;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export async function getTasks(
+    projectId: string,
+    token: string
+): Promise<Task[]> {
+    const response = await fetch(
+        `${API_URL}/projects/${projectId}/tasks`,
+        {
+            method: "GET",
+            headers: {
+                Authorization: `Bearer ${token}`,
+            },
+            cache: "no-store",
+        }
+    );
+
+    const data =
+        (await response.json()) as TasksResponse & {
+            message?: string;
+        };
+
+    if (!response.ok) {
+        throw new Error(
+            data.message ||
+                "Failed to load tasks"
+        );
+    }
+
+    return data.tasks;
 }
