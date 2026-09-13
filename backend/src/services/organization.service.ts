@@ -64,3 +64,20 @@ export async function getOrganizationById(
         },
     });
 }
+
+export async function getOrganizationsByUser(
+    userId: string
+) {
+    return prisma.organization.findMany({
+        where: {
+            members: {
+                some: {
+                    userId,
+                },
+            },
+        },
+        orderBy: {
+            createdAt: "desc",
+        },
+    });
+}

@@ -1,6 +1,6 @@
 import type { Response } from "express";
 import type { AuthenticatedRequest } from "../middleware/auth.middleware.js";
-import { createOrganization, getOrganizationById } from "../services/organization.service.js";
+import { createOrganization, getOrganizationById, getOrganizationsByUser} from "../services/organization.service.js";
 import { addOrganizationMember } from "../services/organization_member.service.js";
 import type { OrganizationRequest } from "../middleware/organization.middleware.js";
 
@@ -140,4 +140,34 @@ export async function getOrganization(
             message: "Failed to retrieve organization",
         });
    }
+}
+
+export async function getMyOrganizations(
+    req: AuthenticatedRequest,
+    res: Response
+) {
+    try {
+        if (!req.user) {
+            return res.status(401).json({
+                status: "error",
+                message: "Authentication required",
+            });
+        }
+
+        const organizations = await getOrganizationsByUser(
+            req.user.userId
+        );
+
+        return res.status(200).json({
+            status: "success",
+            organizations,
+        });
+    } catch (error) {
+        console.error(error);
+
+        return res.status(500).json({
+            status: "error",
+            message: "Failed to retrieve organizations",
+        });
+    }
 }

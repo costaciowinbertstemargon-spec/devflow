@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { createOrganizationController, addMember, getOrganization } from "../controllers/organization.controller.js";
+import { createOrganizationController, addMember, getOrganization, getMyOrganizations } from "../controllers/organization.controller.js";
 import { authenticate } from "../middleware/auth.middleware.js";
 import { requireOrganizationRole } from "../middleware/organization.middleware.js";
 import { validateBody } from "../middleware/validate.middware.js";
@@ -12,6 +12,12 @@ router.post(
     authenticate,
     validateBody(createOrganizationSchema),
     createOrganizationController
+);
+
+router.get(
+    "/",
+    authenticate,
+    getMyOrganizations
 );
 
 router.get(
