@@ -125,3 +125,47 @@ export async function getMe(
 
     return data.user;
 }
+
+{/* Organization */}
+
+export interface Organization {
+    id: string;
+    name: string;
+    description: string | null;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface OrganizationsResponse {
+    status: string;
+    message?: string;
+    organizations: Organization[];
+}
+
+export async function getOrganizations(
+    token: string
+): Promise<Organization[]> {
+    const response = await fetch(
+        `${API_URL}/organizations`,
+        {
+            method: "GET",
+            headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json",
+            },
+            cache: "no-store",
+        }
+    );
+
+    const data =
+        (await response.json()) as OrganizationsResponse;
+
+    if (!response.ok) {
+        throw new Error(
+            data.message ||
+                "Failed to retrieve organizations"
+        );
+    }
+
+    return data.organizations;
+}

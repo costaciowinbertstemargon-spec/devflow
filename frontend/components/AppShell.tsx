@@ -3,6 +3,7 @@
 import {
     Activity,
     Bell,
+    Check,
     ChevronDown,
     FolderKanban,
     LayoutDashboard,
@@ -14,6 +15,7 @@ import {
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { useAuth } from "./AuthProvider";
+import { useOrganization } from "./OrganizationProvider";
 
 const navigation = [
     {
@@ -46,7 +48,14 @@ export default function AppShell({
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const router = useRouter();
     const pathname = usePathname();
+    const [ organizationMenuOpen, setOrganizationMenuOpen] = useState(false);
     const { user, logout } = useAuth();
+    const {
+        organizations,
+        activeOrganization,
+        setActiveOrganization,
+        loading: organizationLoading,
+    } = useOrganization();
 
     return (
         <div className="min-h-screen bg-[var(--background)] text-[var(--text-primary)]">
@@ -83,25 +92,118 @@ export default function AppShell({
 
                 {/* Organization selector */}
                 <div className="border-b border-[var(--border)] p-3">
-                    <button
-                        type="button"
-                        className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left transition hover:bg-[var(--surface-subtle)]"
-                    >
-                        <div className="min-w-0">
-                            <p className="truncate text-sm font-semibold">
-                                My Organization
-                            </p>
+                    <div className="relative">
+                        <button
+                            type="button"
+                            disabled={
+                                organizationLoading ||
+                                organizations.length === 0
+                            }
+                            onClick={() =>
+                                setOrganizationMenuOpen(
+                                    !organizationMenuOpen
+                                )
+                            }
+                            className="flex w-full items-center justify-between rounded-xl border border-transparent bg-[var(--surface-subtle)] px-3 py-2.5 text-left transition hover:border-[var(--border)] hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+                            aria-haspopup="listbox"
+                            aria-expanded={organizationMenuOpen}
+                        >
+                            <div className="min-w-0">
+                                <p className="truncate text-sm font-semibold text-[var(--text-primary)]">
+                                    {organizationLoading
+                                        ? "Loading..."
+                                        : activeOrganization?.name ??
+                                        "No organizations"}
+                                </p>
 
-                            <p className="text-xs text-[var(--text-muted)]">
-                                Workspace
-                            </p>
-                        </div>
+                                <p className="mt-0.5 text-xs text-[var(--text-muted)]">
+                                    Workspace
+                                </p>
+                            </div>
 
-                        <ChevronDown
-                            size={16}
-                            className="shrink-0 text-[var(--text-muted)]"
-                        />
-                    </button>
+                            <ChevronDown
+                                size={16}
+                                className={`shrink-0 text-[var(--text-muted)] transition-transform duration-200 ${
+                                    organizationMenuOpen
+                                        ? "rotate-180"
+                                        : ""
+                                }`}
+                            />
+                        </button>
+
+                        {organizationMenuOpen &&
+                            !organizationLoading &&
+                            organizations.length > 0 && (
+                                <>
+                                    <button
+                                        type="button"
+                                        aria-label="Close organization menu"
+                                        onClick={() =>
+                                            setOrganizationMenuOpen(false)
+                                        }
+                                        className="fixed inset-0 z-40 cursor-default lg:absolute"
+                                    />
+
+                                    <div
+                                        role="listbox"
+                                        aria-label="Select organization"
+                                        className="absolute left-0 right-0 top-[calc(100%+8px)] z-50 overflow-hidden rounded-xl border border-[var(--border)] bg-white p-1.5 shadow-lg"
+                                    >
+                                        {organizations.map((organization) => {
+                                            const selected =
+                                                organization.id ===
+                                                activeOrganization?.id;
+
+                                            return (
+                                                <button
+                                                    key={organization.id}
+                                                    type="button"
+                                                    role="option"
+                                                    aria-selected={selected}
+                                                    onClick={() => {
+                                                        setActiveOrganization(
+                                                            organization
+                                                        );
+                                                        setOrganizationMenuOpen(
+                                                            false
+                                                        );
+                                                    }}
+                                                    className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition ${
+                                                        selected
+                                                            ? "bg-[var(--surface-subtle)]"
+                                                            : "hover:bg-[var(--surface-subtle)]"
+                                                    }`}
+                                                >
+                                                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--primary)]/10 text-xs font-bold text-[var(--primary)]">
+                                                        {organization.name
+                                                            .trim()
+                                                            .charAt(0)
+                                                            .toUpperCase()}
+                                                    </div>
+
+                                                    <div className="min-w-0 flex-1">
+                                                        <p className="truncate text-sm font-medium text-[var(--text-primary)]">
+                                                            {organization.name}
+                                                        </p>
+
+                                                        <p className="truncate text-xs text-[var(--text-muted)]">
+                                                            Workspace
+                                                        </p>
+                                                    </div>
+
+                                                    {selected && (
+                                                        <Check
+                                                            size={16}
+                                                            className="shrink-0 text-[var(--primary)]"
+                                                        />
+                                                    )}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </>
+                            )}
+                    </div>
                 </div>
 
                 {/* Navigation */}

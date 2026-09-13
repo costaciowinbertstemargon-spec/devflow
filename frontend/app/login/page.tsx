@@ -21,6 +21,7 @@ import {
 } from "react";
 
 import { useAuth } from "@/components/AuthProvider";
+import { useOrganization } from "@/components/OrganizationProvider";
 import { login } from "@/lib/api";
 import { setToken } from "@/lib/auth";
 
@@ -28,6 +29,7 @@ function LoginForm() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const { refreshUser } = useAuth();
+    const { refreshOrganizations } = useOrganization();
 
     const registered = searchParams.get("registered");
 
@@ -54,6 +56,7 @@ function LoginForm() {
             setToken(result.token);
 
             await refreshUser();
+            await refreshOrganizations();
 
             router.push("/dashboard");
         } catch (error) {

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { AuthProvider } from "@/components/AuthProvider";
+import { OrganizationProvider } from "@/components/OrganizationProvider";
 
 export const metadata: Metadata = {
     title: "DevFlow",
@@ -19,7 +20,9 @@ export default function RootLayout({
         >
             <body>
                 <AuthProvider>
-                    {children}
+                    <OrganizationProvider>
+                        {children}
+                    </OrganizationProvider>
                 </AuthProvider>
             </body>
         </html>
