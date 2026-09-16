@@ -303,3 +303,413 @@ export async function getTasks(
 
     return data.tasks;
 }
+
+{/* Create Update Tasks */}
+
+export interface CreateTaskResponse {
+    status: string;
+    message?: string;
+    task: Task;
+}
+
+export interface UpdateTaskResponse {
+    status: string;
+    message?: string;
+    task: Task;
+}
+
+export async function createTask(
+    projectId: string,
+    token: string,
+    title: string,
+    description?: string,
+    priority?: string,
+    dueDate?: string
+): Promise<Task> {
+    const response = await fetch(
+        `${API_URL}/projects/${projectId}/tasks`,
+        {
+            method: "POST",
+            headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                title,
+                ...(description?.trim()
+                    ? {
+                          description: description.trim(),
+                      }
+                    : {}),
+                ...(priority
+                    ? {
+                          priority,
+                      }
+                    : {}),
+                ...(dueDate
+                    ? {
+                          dueDate,
+                      }
+                    : {}),
+            }),
+            cache: "no-store",
+        }
+    );
+
+    const data =
+        (await response.json()) as CreateTaskResponse;
+
+    if (!response.ok) {
+        throw new Error(
+            data.message ||
+                "Failed to create task"
+        );
+    }
+
+    return data.task;
+}
+
+export async function updateTask(
+    taskId: string,
+    token: string,
+    values: {
+        title?: string;
+        description?: string | null;
+        status?: string;
+        priority?: string;
+        dueDate?: string | null;
+    }
+): Promise<Task> {
+    const response = await fetch(
+        `${API_URL}/tasks/${taskId}`,
+        {
+            method: "PATCH",
+            headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify(values),
+            cache: "no-store",
+        }
+    );
+
+    const data =
+        (await response.json()) as UpdateTaskResponse;
+
+    if (!response.ok) {
+        throw new Error(
+            data.message ||
+                "Failed to update task"
+        );
+    }
+
+    return data.task;
+}
+
+{/* Single Task Calling */}
+
+export async function getTask(
+    taskId: string,
+    token: string
+): Promise<Task> {
+    const response = await fetch(
+        `${API_URL}/tasks/${taskId}`,
+        {
+            method: "GET",
+            headers: {
+                Authorization: `Bearer ${token}`,
+            },
+            cache: "no-store",
+        }
+    );
+
+    const data =
+        (await response.json()) as {
+            status?: string;
+            message?: string;
+            task?: Task;
+        };
+
+    if (!response.ok) {
+        throw new Error(
+            data.message ||
+                "Failed to load task"
+        );
+    }
+
+    if (!data.task) {
+        throw new Error(
+            "Task data was not returned."
+        );
+    }
+
+    return data.task;
+}
+
+{/* Add and Get Comment */}
+
+export interface CommentUser {
+    id: string;
+    name: string;
+    email: string;
+}
+
+export interface TaskComment {
+    id: string;
+    content: string;
+    taskId: string;
+    userId: string;
+    createdAt: string;
+    updatedAt: string;
+    user: CommentUser;
+}
+
+export interface CommentsResponse {
+    status: string;
+    comments: TaskComment[];
+}
+
+export interface CreateCommentResponse {
+    status: string;
+    message?: string;
+    comment: TaskComment;
+}
+
+export async function getTaskComments(
+    taskId: string,
+    token: string
+): Promise<TaskComment[]> {
+    const response = await fetch(
+        `${API_URL}/tasks/${taskId}/comments`,
+        {
+            method: "GET",
+            headers: {
+                Authorization: `Bearer ${token}`,
+            },
+            cache: "no-store",
+        }
+    );
+
+    const data =
+        (await response.json()) as CommentsResponse & {
+            message?: string;
+        };
+
+    if (!response.ok) {
+        throw new Error(
+            data.message ||
+                "Failed to load comments"
+        );
+    }
+
+    return data.comments;
+}
+
+export async function createComment(
+    taskId: string,
+    token: string,
+    content: string
+): Promise<TaskComment> {
+    const response = await fetch(
+        `${API_URL}/tasks/${taskId}/comments`,
+        {
+            method: "POST",
+            headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                content,
+            }),
+            cache: "no-store",
+        }
+    );
+
+    const data =
+        (await response.json()) as CreateCommentResponse;
+
+    if (!response.ok) {
+        throw new Error(
+            data.message ||
+                "Failed to create comment"
+        );
+    }
+
+    return data.comment;
+}
+
+{/* Get Activities */}
+
+export interface ActivityUser {
+    id: string;
+    name: string;
+    email: string;
+}
+
+export interface TaskActivity {
+    id: string;
+    taskId: string;
+    userId: string;
+    action: string;
+    metadata: Record<string, unknown> | null;
+    createdAt: string;
+    user: ActivityUser;
+}
+
+export interface ActivitiesResponse {
+    status: string;
+    activities: TaskActivity[];
+}
+
+export async function getTaskActivities(
+    taskId: string,
+    token: string
+): Promise<TaskActivity[]> {
+    const response = await fetch(
+        `${API_URL}/tasks/${taskId}/activities`,
+        {
+            method: "GET",
+            headers: {
+                Authorization: `Bearer ${token}`,
+            },
+            cache: "no-store",
+        }
+    );
+
+    const data =
+        (await response.json()) as ActivitiesResponse & {
+            message?: string;
+        };
+
+    if (!response.ok) {
+        throw new Error(
+            data.message ||
+                "Failed to load activities"
+        );
+    }
+
+    return data.activities;
+}
+
+{/* Add and Get Notification */}
+
+export interface Notification {
+    id: string;
+    userId: string;
+    type:
+        | "TASK_ASSIGNED"
+        | "COMMENT_ADDED"
+        | "STATUS_CHANGED"
+        | "MENTION";
+    message: string;
+    taskId: string | null;
+    isRead: boolean;
+    createdAt: string;
+    task: {
+        id: string;
+        title: string;
+    } | null;
+}
+
+export interface NotificationsResponse {
+    status: string;
+    notifications: Notification[];
+}
+
+export async function getNotifications(
+    token: string
+): Promise<Notification[]> {
+    const response = await fetch(
+        `${API_URL}/notifications`,
+        {
+            method: "GET",
+            headers: {
+                Authorization: `Bearer ${token}`,
+            },
+            cache: "no-store",
+        }
+    );
+
+    const data =
+        (await response.json()) as NotificationsResponse & {
+            message?: string;
+        };
+
+    if (!response.ok) {
+        throw new Error(
+            data.message ||
+                "Failed to load notifications"
+        );
+    }
+
+    return data.notifications;
+}
+
+export async function markNotificationRead(
+    notificationId: string,
+    token: string
+): Promise<Notification> {
+    const response = await fetch(
+        `${API_URL}/notifications/${notificationId}/read`,
+        {
+            method: "PATCH",
+            headers: {
+                Authorization: `Bearer ${token}`,
+            },
+            cache: "no-store",
+        }
+    );
+
+    const data =
+        (await response.json()) as {
+            status?: string;
+            message?: string;
+            notification?: Notification;
+        };
+
+    if (!response.ok) {
+        throw new Error(
+            data.message ||
+                "Failed to mark notification as read"
+        );
+    }
+
+    if (!data.notification) {
+        throw new Error(
+            "Notification data was not returned."
+        );
+    }
+
+    return data.notification;
+}
+
+export async function markAllNotificationsRead(
+    token: string
+): Promise<number> {
+    const response = await fetch(
+        `${API_URL}/notifications/read-all`,
+        {
+            method: "PATCH",
+            headers: {
+                Authorization: `Bearer ${token}`,
+            },
+            cache: "no-store",
+        }
+    );
+
+    const data =
+        (await response.json()) as {
+            status?: string;
+            message?: string;
+            updatedCount?: number;
+        };
+
+    if (!response.ok) {
+        throw new Error(
+            data.message ||
+                "Failed to mark all notifications as read"
+        );
+    }
+
+    return data.updatedCount ?? 0;
+}

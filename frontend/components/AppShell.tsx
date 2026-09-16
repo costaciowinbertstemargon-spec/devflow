@@ -16,6 +16,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { useAuth } from "./AuthProvider";
 import { useOrganization } from "./OrganizationProvider";
+import { useNotifications } from "./NotificationProvider";
 
 const navigation = [
     {
@@ -49,6 +50,7 @@ export default function AppShell({
     const router = useRouter();
     const pathname = usePathname();
     const [ organizationMenuOpen, setOrganizationMenuOpen] = useState(false);
+    const { unreadCount } = useNotifications();
     const { user, logout } = useAuth();
     const {
         organizations,
@@ -236,6 +238,10 @@ export default function AppShell({
                                         if (item.label === "Projects") {
                                             router.push("/projects");
                                         }
+                                        
+                                        if (item.label === "Notifications") {
+                                            router.push("/notifications");
+                                        }                                        
                                     }}
                                     className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition ${
                                         active
@@ -247,11 +253,12 @@ export default function AppShell({
 
                                     <span>{item.label}</span>
 
-                                    {item.label === "Notifications" && (
-                                        <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--primary)] px-1.5 text-[10px] font-semibold text-white">
-                                            3
-                                        </span>
-                                    )}
+                                    {item.label === "Notifications" &&
+                                        unreadCount > 0 && (
+                                            <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--primary)] px-1.5 text-[10px] font-semibold text-white">
+                                                {unreadCount}
+                                            </span>
+                                        )}
                                 </button>
                             );
                         })}

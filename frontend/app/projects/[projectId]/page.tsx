@@ -3,6 +3,7 @@
 import AppShell from "@/components/AppShell";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { 
+    createTask,
     getProject,
     getTasks, 
     type Project,
@@ -23,6 +24,7 @@ import {
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 function getStatusIcon(status: string) {
     if (status === "Done") {
@@ -39,6 +41,7 @@ function getStatusIcon(status: string) {
 export default function ProjectDetailsPage() {
     const params = useParams();
     const projectId = params.projectId as string;
+    const router = useRouter();
 
     const [project, setProject] = useState<Project | null>(null);
     const [loading, setLoading] = useState(true);
@@ -47,6 +50,15 @@ export default function ProjectDetailsPage() {
     const [tasks, setTasks] = useState<Task[]>([]);
     const [tasksLoading, setTasksLoading] = useState(true);
     const [tasksError, setTasksError] = useState("");
+
+    const [createTaskModalOpen, setCreateTaskModalOpen] = useState(false);
+    const [taskTitle, setTaskTitle] = useState("");
+    const [taskDescription, setTaskDescription] = useState("");
+    const [taskPriority, setTaskPriority] = useState("MEDIUM");
+    const [taskStatus, setTaskStatus] = useState("TODO");
+    const [taskDueDate, setTaskDueDate] = useState("");
+    const [savingTask, setSavingTask] = useState(false);
+    const [taskFormError, setTaskFormError] = useState("");
 
     useEffect(() => {
         async function loadProjectData() {
@@ -96,6 +108,69 @@ export default function ProjectDetailsPage() {
 
         void loadProjectData();
     }, [projectId]);
+
+    async function handleCreateTask(
+        event: React.FormEvent<HTMLFormElement>    
+    ) {
+        event.preventDefault();
+
+        const token = getToken();
+
+        if (!token) {
+            setTaskFormError("Authentication required.");
+            return;
+        }
+
+        if (!projectId) {
+            setTaskFormError("Project ID is missing.");
+            return;
+        }
+
+        if (!taskTitle.trim()) {
+            setTaskFormError("Task title is required.");
+            return;
+        }
+
+        setSavingTask(true);
+        setTaskFormError("");
+
+        try {
+            await createTask(
+                projectId,
+                token,
+                taskTitle.trim(),
+                taskDescription,
+                taskPriority,
+                taskDueDate
+                    ? new Date(
+                        `${taskDueDate}T00:00:00`
+                    ).toISOString()
+                    : undefined
+            );
+
+            const updatedTasks =
+                await getTasks(
+                    projectId,
+                    token
+                );
+            
+            setTasks(updatedTasks);
+
+            setCreateTaskModalOpen(false);
+            setTaskTitle("");
+            setTaskDescription("");
+            setTaskPriority("MEDIUM");
+            setTaskDueDate("");
+        } catch (error) {
+            setTaskFormError(
+                error instanceof Error
+                    ? error.message
+                    : "Failed to create task."
+            );
+        } finally {
+            setSavingTask(false);
+        }
+    }
 
     return (
         <ProtectedRoute>
@@ -278,6 +353,14 @@ export default function ProjectDetailsPage() {
 
                                 <button
                                     type="button"
+                                    onClick={() => {
+                                        setTaskFormError("");
+                                        setTaskTitle("");
+                                        setTaskDescription("");
+                                        setTaskPriority("MEDIUM");
+                                        setTaskDueDate("");
+                                        setCreateTaskModalOpen(true);
+                                    }}
                                     className="inline-flex items-center justify-center gap-2 rounded-lg bg-[var(--primary)] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--primary-hover)]"
                                 >
                                     <Plus size={17} />
@@ -374,6 +457,9 @@ export default function ProjectDetailsPage() {
                                             <button
                                                 key={task.id}
                                                 type="button"
+                                                onClick={() => router.push(
+                                                    `/projects/${projectId}/tasks/${task.id}`
+                                                )}
                                                 className="grid w-full gap-4 px-5 py-4 text-left transition hover:bg-[var(--surface-subtle)] md:grid-cols-[minmax(0,2fr)_150px_110px_100px_40px] md:items-center"
                                             >
                                                 <div className="min-w-0">
@@ -442,6 +528,181 @@ export default function ProjectDetailsPage() {
                                 </div>
                             )}
                         </>
+                    )}
+
+                    {createTaskModalOpen && (
+                        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/30 px-4 py-8 backdrop-blur-sm">
+                            <button
+                                type="button"
+                                aria-label="Close create task dialog"
+                                onClick={() =>
+                                    setCreateTaskModalOpen(false)
+                                }
+                                className="absolute inset-0 cursor-default"
+                            />
+
+                            <div
+                                role="dialog"
+                                aria-modal="true"
+                                aria-labelledby="create-task-title"
+                                className="relative z-10 w-full max-w-lg rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-6 shadow-xl sm:p-7"
+                            >
+                                <div className="mb-5">
+                                    <h2
+                                        id="create-task-title"
+                                        className="text-xl font-bold tracking-tight"
+                                    >
+                                        Create a new task
+                                    </h2>
+
+                                    <p className="mt-1 text-sm text-[var(--text-secondary)]">
+                                        Add a task to this project and start
+                                        tracking progress.
+                                    </p>
+                                </div>
+
+                                {taskFormError && (
+                                    <div
+                                        role="alert"
+                                        className="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+                                    >
+                                        {taskFormError}
+                                    </div>
+                                )}
+
+                                <form
+                                    onSubmit={handleCreateTask}
+                                    className="space-y-5"
+                                >
+                                    <div>
+                                        <label
+                                            htmlFor="create-task-title"
+                                            className="mb-2 block text-sm font-semibold"
+                                        >
+                                            Task title
+                                        </label>
+
+                                        <input
+                                            id="create-task-title"
+                                            type="text"
+                                            value={taskTitle}
+                                            onChange={(event) =>
+                                                setTaskTitle(
+                                                    event.target.value
+                                                )
+                                            }
+                                            placeholder="e.g. Create login screen"
+                                            required
+                                            autoFocus
+                                            className="h-12 w-full rounded-xl border border-[var(--border)] bg-white px-4 text-sm outline-none transition placeholder:text-[var(--text-muted)] focus:border-[var(--primary)] focus:ring-4 focus:ring-[var(--accent)]/10"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label
+                                            htmlFor="create-task-description"
+                                            className="mb-2 block text-sm font-semibold"
+                                        >
+                                            Description
+                                        </label>
+
+                                        <textarea
+                                            id="create-task-description"
+                                            value={taskDescription}
+                                            onChange={(event) =>
+                                                setTaskDescription(
+                                                    event.target.value
+                                                )
+                                            }
+                                            rows={3}
+                                            placeholder="Describe the work to be done..."
+                                            className="w-full resize-none rounded-xl border border-[var(--border)] bg-white px-4 py-3 text-sm outline-none transition placeholder:text-[var(--text-muted)] focus:border-[var(--primary)] focus:ring-4 focus:ring-[var(--accent)]/10"
+                                        />
+                                    </div>
+
+                                    <div className="grid gap-4 sm:grid-cols-2">
+                                        <div>
+                                            <label
+                                                htmlFor="create-task-priority"
+                                                className="mb-2 block text-sm font-semibold"
+                                            >
+                                                Priority
+                                            </label>
+
+                                            <select
+                                                id="create-task-priority"
+                                                value={taskPriority}
+                                                onChange={(event) =>
+                                                    setTaskPriority(
+                                                        event.target.value
+                                                    )
+                                                }
+                                                className="h-12 w-full rounded-xl border border-[var(--border)] bg-white px-4 text-sm outline-none focus:border-[var(--primary)] focus:ring-4 focus:ring-[var(--accent)]/10"
+                                            >
+                                                <option value="LOW">
+                                                    Low
+                                                </option>
+                                                <option value="MEDIUM">
+                                                    Medium
+                                                </option>
+                                                <option value="HIGH">
+                                                    High
+                                                </option>
+                                                <option value="URGENT">
+                                                    Urgent
+                                                </option>
+                                            </select>
+                                        </div>
+
+                                        <div>
+                                            <label
+                                                htmlFor="create-task-due-date"
+                                                className="mb-2 block text-sm font-semibold"
+                                            >
+                                                Due date
+                                            </label>
+
+                                            <input
+                                                id="create-task-due-date"
+                                                type="date"
+                                                value={taskDueDate}
+                                                onChange={(event) =>
+                                                    setTaskDueDate(
+                                                        event.target.value
+                                                    )
+                                                }
+                                                className="h-12 w-full rounded-xl border border-[var(--border)] bg-white px-4 text-sm outline-none focus:border-[var(--primary)] focus:ring-4 focus:ring-[var(--accent)]/10"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-end">
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                setCreateTaskModalOpen(false)
+                                            }
+                                            className="rounded-xl border border-[var(--border)] px-4 py-2.5 text-sm font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--surface-subtle)]"
+                                        >
+                                            Cancel
+                                        </button>
+
+                                        <button
+                                            type="submit"
+                                            disabled={
+                                                savingTask ||
+                                                !taskTitle.trim()
+                                            }
+                                            className="inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--primary)] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--primary-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+                                        >
+                                            {savingTask
+                                                ? "Creating..."
+                                                : "Create task"}
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
                     )}
                 </div>
             </AppShell>

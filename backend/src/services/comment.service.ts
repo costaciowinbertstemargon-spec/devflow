@@ -72,3 +72,59 @@ export async function createComment(
 
     return comment;
 }
+
+export async function getTaskComments(
+    taskId: string,
+    userId: string
+) {
+    const task = await prisma.task.findUnique({
+        where: {
+            id: taskId,
+        },
+        include: {
+            project: {
+                select: {
+                    organizationId: true,
+                },
+            },
+        },
+    });
+
+    if (!task) {
+        throw new Error("Task not found");
+    }
+
+    const membership =
+        await prisma.organizationMember.findUnique({
+            where: {
+                userId_organizationId: {
+                    userId,
+                    organizationId: task.project.organizationId,
+                },
+            },
+        });
+
+    if (!membership) {
+        throw new Error(
+            "You are not a member of this organization"
+        );
+    }
+
+    return prisma.comment.findMany({
+        where: {
+            taskId,
+        },
+        orderBy: {
+            createdAt: "asc",
+        },
+        include: {
+            user: {
+                select: {
+                    id: true,
+                    name: true,
+                    email: true,
+                },
+            },
+        },
+    });
+}
