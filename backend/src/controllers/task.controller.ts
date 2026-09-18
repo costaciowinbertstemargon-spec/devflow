@@ -1,7 +1,13 @@
 import type { Response } from "express";
 import type { AuthenticatedRequest } from "../middleware/auth.middleware.js";
-import { createTask, updateTask, getProjectTasks, getTaskById } from "../services/task.service.js";
 import type { GetTasksFilter } from "../services/task.service.js";
+import {
+    createTask,
+    updateTask,
+    getProjectTasks,
+    getTaskById,
+    getMyTasks,
+} from "../services/task.service.js";
 
 export async function createTaskController(
     req: AuthenticatedRequest,
@@ -308,6 +314,36 @@ export async function getProjectTasksController(
         return res.status(500).json({
             status: "error",
             message: "Failed to retrieve tasks",
+        });
+    }
+}
+
+export async function getMyTasksController(
+    req: AuthenticatedRequest,
+    res: Response
+) {
+    try {
+        if (!req.user) {
+            return res.status(401).json({
+                status: "error",
+                message: "Authentication required",
+            });
+        }
+
+        const tasks = await getMyTasks(
+            req.user.userId
+        );
+
+        return res.status(200).json({
+            status: "success",
+            tasks,
+        });
+    } catch (error) {
+        console.error(error);
+
+        return res.status(500).json({
+            status: "error",
+            message: "Failed to retrieve your tasks",
         });
     }
 }

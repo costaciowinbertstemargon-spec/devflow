@@ -406,6 +406,38 @@ export async function getProjectTasks(
     });
 }
 
+export async function getMyTasks(
+    userId: string
+) {
+    return prisma.task.findMany({
+        where: {
+            assigneeId: userId,
+        },
+
+        orderBy: {
+            createdAt: "desc",
+        },
+
+        include: {
+            assignee: {
+                select: {
+                    id: true,
+                    name: true,
+                    email: true,
+                },
+            },
+
+            project: {
+                select: {
+                    id: true,
+                    name: true,
+                    organizationId: true,
+                },
+            },
+        },
+    });
+}
+
 export async function getTaskById(
     taskId: string,
     userId: string    

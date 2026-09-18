@@ -1,8 +1,14 @@
 import { Router } from "express";
-import { createTaskController, updateTaskController, getProjectTasksController, getTaskController } from "../controllers/task.controller.js";
 import { authenticate } from "../middleware/auth.middleware.js";
 import { validateBody } from "../middleware/validate.middware.js";
 import { createTaskSchema, updateTaskSchema } from "../schemas/task.schema.js";
+import {
+    createTaskController,
+    updateTaskController,
+    getProjectTasksController,
+    getTaskController,
+    getMyTasksController,
+} from "../controllers/task.controller.js";
 
 const router = Router();
 
@@ -11,6 +17,12 @@ router.post(
     authenticate,
     validateBody(createTaskSchema),
     createTaskController
+);
+
+router.get(
+    "/tasks/my",
+    authenticate,
+    getMyTasksController
 );
 
 router.patch(
