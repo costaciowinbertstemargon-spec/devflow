@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
-import { loginSchema, registerSchema } from "../utils/auth.validation.js";
-import { registerUser, loginUser } from "../services/auth.service.js";
+import { loginSchema, registerSchema, updateProfileSchema } from "../utils/auth.validation.js";
+import { registerUser, loginUser, updateUserProfile } from "../services/auth.service.js";
 import type { AuthenticatedRequest } from "../middleware/auth.middleware.js";
 import { prisma } from "../config/database.js";
 
@@ -124,6 +124,85 @@ export async function getMe(
             user,
         });
     } catch (error) {
+        console.error(error);
+
+        return res.status(500).json({
+            status: "error",
+            message: "Something went wrong",
+        });
+    }
+}
+
+export async function updateMe(
+    req: AuthenticatedRequest,
+    res: Response
+) {
+    try {
+        if (!req.user) {
+            return res.status(401).json({
+                status: "error",
+                message: "Authentication required",
+            });
+        }
+
+        const result = updateProfileSchema.safeParse(
+            req.body
+        );
+
+        if (!result.success) {
+            return res.status(400).json({
+                status: "error",
+                message: "Invalid profile data",
+                errors: result.error.flatten().fieldErrors,
+            });
+        }
+
+        const user = await updateUserProfile(
+            req.user.userId,
+            result.data
+        );
+
+        return res.status(200).json({
+            status: "success",
+            message: "Profile updated successfully",
+            user,
+        });
+    } catch (error) {
+        if (
+            error instanceof Error &&
+            error.message === "User not found"
+        ) {
+            return res.status(404).json({
+                status: "error",
+                message: error.message,
+            });
+        }
+
+        if (
+            error instanceof Error &&
+            (
+                error.message === "Email is already registered" ||
+                error.message === "No changes provided" ||
+                error.message === "Current password is required to change your email" ||
+                error.message === "Current password is required to change your password"
+            )
+        ) {
+            return res.status(400).json({
+                status: "error",
+                message: error.message,
+            });
+        }
+
+        if (
+            error instanceof Error &&
+            error.message === "Current password is incorrect"
+        ) {
+            return res.status(400).json({
+                status: "error",
+                message: error.message,
+            });
+        }
+
         console.error(error);
 
         return res.status(500).json({

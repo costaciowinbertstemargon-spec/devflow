@@ -85,11 +85,14 @@ export async function getProject(
     return data.project;
 }
 
-{/* Login */}
+{/* Login and Update Profile */}
 
 export interface User {
     id: string;
+    name: string;
     email: string;
+    createdAt: string;
+    updatedAt?: string;
 }
 
 export interface LoginResponse {
@@ -124,6 +127,43 @@ export async function login(
     }
 
     return data;
+}
+
+export interface UpdateProfileInput {
+    name?: string;
+    email?: string;
+    currentPassword?: string;
+    newPassword?: string;
+}
+
+interface UpdateProfileResponse extends ApiResponse<User> {
+    user: User;
+}
+
+export async function updateProfile(
+    input: UpdateProfileInput,
+    token: string
+): Promise<User> {
+    const response = await fetch(`${API_URL}/auth/me`, {
+        method: "PATCH",
+        headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify(input),
+        cache: "no-store",
+    });
+
+    const data =
+        (await response.json()) as UpdateProfileResponse;
+
+    if (!response.ok) {
+        throw new Error(
+            data.message || "Failed to update profile"
+        );
+    }
+
+    return data.user;
 }
 
 {/* Get Me */}
@@ -255,7 +295,7 @@ export async function createProject(
     return data.project;
 }
 
-{/* Getting Tasks */}
+{/* Getting Tasks and Get My Tasks */}
 
 export interface TasksResponse {
     status: string;
@@ -266,12 +306,23 @@ export interface Task {
     id: string;
     title: string;
     description: string | null;
+    projectId: string;
+    assigneeId: string | null;
     status: string;
     priority: string;
     dueDate: string | null;
-    assigneeId: string | null;
     createdAt: string;
     updatedAt: string;
+    assignee?: {
+        id: string;
+        name: string;
+        email: string;
+    } | null;
+    project?: {
+        id: string;
+        name: string;
+        organizationId: string;
+    } | null;
 }
 
 export async function getTasks(
@@ -302,6 +353,37 @@ export async function getTasks(
     }
 
     return data.tasks;
+}
+
+export async function getMyTasks(
+    token: string
+): Promise<Task[]> {
+    const response = await fetch(
+        `${API_URL}/tasks/my`,
+        {
+            method: "GET",
+            headers: {
+                Authorization: `Bearer ${token}`,
+            },
+            cache: "no-store",
+        }
+    );
+
+    const data =
+        (await response.json()) as {
+            status?: string;
+            message?: string;
+            tasks?: Task[];
+        };
+
+    if (!response.ok) {
+        throw new Error(
+            data.message ||
+                "Failed to load your tasks"
+        );
+    }
+
+    return data.tasks ?? [];
 }
 
 {/* Create Update Tasks */}
@@ -712,4 +794,116 @@ export async function markAllNotificationsRead(
     }
 
     return data.updatedCount ?? 0;
+}
+
+{/* Get Organization */}
+
+export interface OrganizationMember {
+    id: string;
+    role: "OWNER" | "ADMIN" | "MEMBER";
+    userId: string;
+    organizationId: string;
+    createdAt: string;
+    user: {
+        id: string;
+        name: string;
+        email: string;
+    };
+}
+
+export interface OrganizationDetails {
+    id: string;
+    name: string;
+    description: string | null;
+    createdAt: string;
+    updatedAt: string;
+    members: OrganizationMember[];
+}
+
+export interface OrganizationDetailsResponse {
+    status: string;
+    organization: OrganizationDetails;
+}
+
+export interface AddMemberResponse {
+    status: string;
+    message?: string;
+    membership: OrganizationMember;
+}
+
+export async function getOrganization(
+    organizationId: string,
+    token: string
+): Promise<OrganizationDetails> {
+    const response = await fetch(
+        `${API_URL}/organizations/${organizationId}`,
+        {
+            method: "GET",
+            headers: {
+                Authorization: `Bearer ${token}`,
+            },
+            cache: "no-store",
+        }
+    );
+
+    const data =
+        (await response.json()) as OrganizationDetailsResponse & {
+            message?: string;
+        };
+
+    if (!response.ok) {
+        throw new Error(
+            data.message ||
+                "Failed to load organization"
+        );
+    }
+
+    if (!data.organization) {
+        throw new Error(
+            "Organization data was not returned."
+        );
+    }
+
+    return data.organization;
+}
+
+export async function addOrganizationMember(
+    organizationId: string,
+    token: string,
+    email: string,
+    role: "ADMIN" | "MEMBER"
+): Promise<OrganizationMember> {
+    const response = await fetch(
+        `${API_URL}/organizations/${organizationId}/members`,
+        {
+            method: "POST",
+            headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                email,
+                role,
+            }),
+            cache: "no-store",
+        }
+    );
+
+    const data =
+        (await response.json()) as AddMemberResponse;
+
+    if (!response.ok) {
+        throw new Error(
+            data.message ||
+                "Failed to add member"
+        );
+    }
+
+    if (!data.membership) {
+        throw new Error(
+            "Membership data was not returned."
+        );
+    }
+
+    return data.membership;
 }

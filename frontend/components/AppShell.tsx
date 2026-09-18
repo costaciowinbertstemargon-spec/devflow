@@ -11,6 +11,7 @@ import {
     Menu,
     Settings,
     UserCircle,
+    Users,
 } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
@@ -26,6 +27,10 @@ const navigation = [
     {
         label: "Projects",
         icon: FolderKanban,
+    },
+    {
+        label: "Members",
+        icon: Users,
     },
     {
         label: "My Tasks",
@@ -238,6 +243,14 @@ export default function AppShell({
                                         if (item.label === "Projects") {
                                             router.push("/projects");
                                         }
+
+                                        if (item.label === "Members") {
+                                            router.push("/members");
+                                        }
+                                        
+                                        if (item.label === "My Tasks") {
+                                            router.push("/my-tasks");
+                                        }
                                         
                                         if (item.label === "Notifications") {
                                             router.push("/notifications");
@@ -269,9 +282,16 @@ export default function AppShell({
                 <div className="border-t border-[var(--border)] p-3">
                     <button
                         type="button"
-                        className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-[var(--text-secondary)] transition hover:bg-[var(--surface-subtle)] hover:text-[var(--text-primary)]"
-                    >
-                        <Settings size={18} />
+                        onClick={() => {
+                            setSidebarOpen(false);
+                            router.push("/settings");
+                        }}
+                        className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition ${
+                            pathname === "/settings"
+                                ? "bg-[var(--surface-subtle)] font-medium text-[var(--primary)]"
+                                : "text-[var(--text-secondary)] hover:bg-[var(--surface-subtle)] hover:text-[var(--text-primary)]"
+                        }`}                    >
+                                            <Settings size={18} />
                         <span>Settings</span>
                     </button>
 

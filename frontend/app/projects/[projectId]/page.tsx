@@ -23,7 +23,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 
 function getStatusIcon(status: string) {
@@ -59,6 +59,29 @@ export default function ProjectDetailsPage() {
     const [taskDueDate, setTaskDueDate] = useState("");
     const [savingTask, setSavingTask] = useState(false);
     const [taskFormError, setTaskFormError] = useState("");
+
+    const [search, setSearch] = useState("");
+    const [filtersOpen, setFiltersOpen] = useState(false);
+    const [statusFilter, setStatusFilter] = useState<
+            "ALL" |
+            "TODO" |
+            "IN_PROGRESS" |
+            "REVIEW" |
+            "DONE"
+        >("ALL");
+    const [priorityFilter, setPriorityFilter] = useState<
+            "ALL" |
+            "LOW" |
+            "MEDIUM" |
+            "HIGH" |
+            "URGENT"
+        >("ALL");
+    const [sortBy, setSortBy] = useState<
+        "updated-desc" |
+        "created-desc" |
+        "due-asc" |
+        "name-asc"
+    >("updated-desc");
 
     useEffect(() => {
         async function loadProjectData() {
@@ -171,6 +194,96 @@ export default function ProjectDetailsPage() {
             setSavingTask(false);
         }
     }
+
+    const filteredTasks = useMemo(() => {
+        const query = search.trim().toLowerCase();
+
+        const filtered = tasks.filter((task) => {
+            const matchesSearch =
+                !query ||
+                task.title
+                    .toLowerCase()
+                    .includes(query) ||
+                (task.description ?? "")
+                    .toLowerCase()
+                    .includes(query) ||
+                task.status
+                    .toLowerCase()
+                    .includes(query) ||
+                task.priority
+                    .toLowerCase()
+                    .includes(query);
+
+            const matchesStatus =
+                statusFilter === "ALL" ||
+                task.status === statusFilter;
+
+            const matchesPriority =
+                priorityFilter === "ALL" ||
+                task.priority === priorityFilter;
+
+            return (
+                matchesSearch &&
+                matchesStatus &&
+                matchesPriority
+            );
+        });
+
+        return [...filtered].sort((first, second) => {
+            switch (sortBy) {
+                case "name-asc":
+                    return first.title.localeCompare(
+                        second.title
+                    );
+
+                case "created-desc":
+                    return (
+                        new Date(
+                            second.createdAt
+                        ).getTime() -
+                        new Date(
+                            first.createdAt
+                        ).getTime()
+                    );
+
+                case "due-asc": {
+                    if (!first.dueDate) {
+                        return 1;
+                    }
+
+                    if (!second.dueDate) {
+                        return -1;
+                    }
+
+                    return (
+                        new Date(
+                            first.dueDate
+                        ).getTime() -
+                        new Date(
+                            second.dueDate
+                        ).getTime()
+                    );
+                }
+
+                case "updated-desc":
+                default:
+                    return (
+                        new Date(
+                            second.updatedAt
+                        ).getTime() -
+                        new Date(
+                            first.updatedAt
+                        ).getTime()
+                    );
+            }
+        });
+    }, [
+        tasks,
+        search,
+        statusFilter,
+        priorityFilter,
+        sortBy,
+    ]);
 
     return (
         <ProtectedRoute>
@@ -378,6 +491,10 @@ export default function ProjectDetailsPage() {
 
                                     <input
                                         type="search"
+                                        value={search}
+                                        onChange={(event) => 
+                                            setSearch(event.target.value)
+                                        }
                                         placeholder="Search tasks..."
                                         className="h-11 w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] pl-10 pr-4 text-sm outline-none transition placeholder:text-[var(--text-muted)] focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--accent)]/20"
                                     />
@@ -385,12 +502,163 @@ export default function ProjectDetailsPage() {
 
                                 <button
                                     type="button"
-                                    className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 text-sm font-medium text-[var(--text-secondary)] transition hover:bg-[var(--surface-subtle)]"
+                                    onClick={() => 
+                                        setFiltersOpen(
+                                            (current) => !current
+                                        )
+                                    }
+                                    className={`inline-flex h-11 items-center justify-center gap-2 rounded-lg border px-4 text-sm font-medium transition ${
+                                        filtersOpen ||
+                                        statusFilter !== "ALL" ||
+                                        priorityFilter !== "ALL"
+                                            ? "border-[var(--primary)] bg-[var(--primary)]/5 text-[var(--primary)]"
+                                            : "border-[var(--border)] bg-[var(--surface)] text-[var(--text-secondary)] hover:bg-[var(--surface-subtle)]"
+                                    }`}                                
                                 >
                                     <Filter size={16} />
                                     Filters
                                 </button>
                             </div>
+
+                            {filtersOpen && (
+                                <div className="mt-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-sm">
+                                    <div className="grid gap-4 md:grid-cols-3">
+                                        <div>
+                                            <label
+                                                htmlFor="task-status-filter"
+                                                className="mb-2 block text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]"
+                                            >
+                                                Status
+                                            </label>
+
+                                            <select
+                                                id="task-status-filter"
+                                                value={statusFilter}
+                                                onChange={(event) =>
+                                                    setStatusFilter(
+                                                        event.target.value as typeof statusFilter
+                                                    )
+                                                }
+                                                className="h-10 w-full rounded-lg border border-[var(--border)] bg-white px-3 text-sm outline-none focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--accent)]/20"
+                                            >
+                                                <option value="ALL">
+                                                    All statuses
+                                                </option>
+
+                                                <option value="TODO">
+                                                    To Do
+                                                </option>
+
+                                                <option value="IN_PROGRESS">
+                                                    In Progress
+                                                </option>
+
+                                                <option value="REVIEW">
+                                                    Review
+                                                </option>
+
+                                                <option value="DONE">
+                                                    Done
+                                                </option>
+                                            </select>
+                                        </div>
+
+                                        <div>
+                                            <label
+                                                htmlFor="task-priority-filter"
+                                                className="mb-2 block text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]"
+                                            >
+                                                Priority
+                                            </label>
+
+                                            <select
+                                                id="task-priority-filter"
+                                                value={priorityFilter}
+                                                onChange={(event) =>
+                                                    setPriorityFilter(
+                                                        event.target.value as typeof priorityFilter
+                                                    )
+                                                }
+                                                className="h-10 w-full rounded-lg border border-[var(--border)] bg-white px-3 text-sm outline-none focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--accent)]/20"
+                                            >
+                                                <option value="ALL">
+                                                    All priorities
+                                                </option>
+
+                                                <option value="LOW">
+                                                    Low
+                                                </option>
+
+                                                <option value="MEDIUM">
+                                                    Medium
+                                                </option>
+
+                                                <option value="HIGH">
+                                                    High
+                                                </option>
+
+                                                <option value="URGENT">
+                                                    Urgent
+                                                </option>
+                                            </select>
+                                        </div>
+
+                                        <div>
+                                            <label
+                                                htmlFor="task-sort"
+                                                className="mb-2 block text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]"
+                                            >
+                                                Sort
+                                            </label>
+
+                                            <select
+                                                id="task-sort"
+                                                value={sortBy}
+                                                onChange={(event) =>
+                                                    setSortBy(
+                                                        event.target.value as typeof sortBy
+                                                    )
+                                                }
+                                                className="h-10 w-full rounded-lg border border-[var(--border)] bg-white px-3 text-sm outline-none focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--accent)]/20"
+                                            >
+                                                <option value="updated-desc">
+                                                    Recently updated
+                                                </option>
+
+                                                <option value="created-desc">
+                                                    Newest created
+                                                </option>
+
+                                                <option value="due-asc">
+                                                    Due date
+                                                </option>
+
+                                                <option value="name-asc">
+                                                    Task name A–Z
+                                                </option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    {(search ||
+                                        statusFilter !== "ALL" ||
+                                        priorityFilter !== "ALL") && (
+                                        <div className="mt-4 flex justify-end border-t border-[var(--border)] pt-4">
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setSearch("");
+                                                    setStatusFilter("ALL");
+                                                    setPriorityFilter("ALL");
+                                                }}
+                                                className="text-sm font-medium text-[var(--primary)] hover:underline"
+                                            >
+                                                Clear filters
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
 
                             {/* Task table */}
                             {tasksLoading && (
@@ -425,7 +693,7 @@ export default function ProjectDetailsPage() {
                                 </div>
                             )}
 
-                            {!tasksLoading && !tasksError && tasks.length === 0 && (
+                            {!tasksLoading && !tasksError && filteredTasks.length === 0 && (
                                 <div className="mt-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-10 text-center">
                                     <CheckCircle2
                                         size={32}
@@ -433,16 +701,20 @@ export default function ProjectDetailsPage() {
                                     />
 
                                     <h2 className="text-base font-semibold">
-                                        No tasks yet
+                                        {tasks.length === 0
+                                            ? "No tasks yet"
+                                            : "No matching tasks"}
                                     </h2>
 
                                     <p className="mt-1 text-sm text-[var(--text-secondary)]">
-                                        Add a task to start organizing work in this project.
+                                        {tasks.length === 0
+                                            ? "Add a task to start organizing work in this project."
+                                            : "Try adjusting your search or filters."}
                                     </p>
                                 </div>
                             )}
 
-                            {!tasksLoading && !tasksError && tasks.length > 0 && (
+                            {!tasksLoading && !tasksError && filteredTasks.length > 0 && (
                                 <div className="mt-4 overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)]">
                                     <div className="hidden border-b border-[var(--border)] px-5 py-3 text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)] md:grid md:grid-cols-[minmax(0,2fr)_150px_110px_100px_40px] md:gap-4">
                                         <div>Task</div>
@@ -453,7 +725,7 @@ export default function ProjectDetailsPage() {
                                     </div>
 
                                     <div className="divide-y divide-[var(--border)]">
-                                        {tasks.map((task) => (
+                                        {filteredTasks.map((task) => (
                                             <button
                                                 key={task.id}
                                                 type="button"
