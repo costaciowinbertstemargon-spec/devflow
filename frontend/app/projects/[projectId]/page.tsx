@@ -285,6 +285,17 @@ export default function ProjectDetailsPage() {
         sortBy,
     ]);
 
+    const totalTasks = tasks.length;
+    const todoTasks = tasks.filter(
+        (task) => task.status === "TODO"
+    ).length;
+    const inProgressTasks = tasks.filter(
+        (task) => task.status === "IN_PROGRESS"
+    ).length;
+    const completedTasks = tasks.filter(
+        (task) => task.status === "DONE"
+    ).length;
+
     return (
         <ProtectedRoute>
             <AppShell>
@@ -328,6 +339,14 @@ export default function ProjectDetailsPage() {
                             <p className="mt-1 text-sm text-red-700">
                                 {error}
                             </p>
+
+                            <button
+                                type="button"
+                                onClick={() => window.location.reload()}
+                                className="mt-3 inline-flex items-center rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-sm font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--surface-subtle)]"
+                            >
+                                Try Again
+                            </button>
 
                             <Link
                                 href="/projects"
@@ -379,7 +398,7 @@ export default function ProjectDetailsPage() {
                                     <div className="flex items-center gap-2">
                                         <button
                                             type="button"
-                                            className="inline-flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2.5 text-sm font-medium text-[var(--text-secondary)] transition hover:bg-[var(--surface-subtle)] hover:text-[var(--text-primary)]"
+                                            className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2.5 text-sm font-medium text-[var(--text-secondary)] transition hover:bg-[var(--surface-subtle)] hover:text-[var(--text-primary)]"
                                         >
                                             <Users size={16} />
                                             Members
@@ -403,7 +422,7 @@ export default function ProjectDetailsPage() {
                                         </p>
 
                                         <p className="mt-1 text-xl font-bold">
-                                            24
+                                            {totalTasks}
                                         </p>
                                     </div>
 
@@ -413,7 +432,7 @@ export default function ProjectDetailsPage() {
                                         </p>
 
                                         <p className="mt-1 text-xl font-bold">
-                                            8
+                                            {todoTasks}
                                         </p>
                                     </div>
 
@@ -423,7 +442,7 @@ export default function ProjectDetailsPage() {
                                         </p>
 
                                         <p className="mt-1 text-xl font-bold">
-                                            7
+                                            {inProgressTasks}
                                         </p>
                                     </div>
 
@@ -433,15 +452,15 @@ export default function ProjectDetailsPage() {
                                         </p>
 
                                         <p className="mt-1 text-xl font-bold">
-                                            9
+                                            {completedTasks}
                                         </p>
                                     </div>
                                 </div>
                             </div>
 
                             {/* Workspace toolbar */}
-                            <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                                <div className="flex items-center gap-2">
+                            <div className="mt-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                                <div className="flex w-full items-center gap-2 sm:w-auto">
                                     <button
                                         type="button"
                                         className="rounded-lg bg-[var(--primary)] px-3.5 py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--primary-hover)]"
@@ -474,7 +493,7 @@ export default function ProjectDetailsPage() {
                                         setTaskDueDate("");
                                         setCreateTaskModalOpen(true);
                                     }}
-                                    className="inline-flex items-center justify-center gap-2 rounded-lg bg-[var(--primary)] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--primary-hover)]"
+                                    className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--primary)] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--primary-hover)]"
                                 >
                                     <Plus size={17} />
                                     Add Task
@@ -507,7 +526,7 @@ export default function ProjectDetailsPage() {
                                             (current) => !current
                                         )
                                     }
-                                    className={`inline-flex h-11 items-center justify-center gap-2 rounded-lg border px-4 text-sm font-medium transition ${
+                                    className={`inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg border px-4 text-sm font-medium transition sm:w-auto ${
                                         filtersOpen ||
                                         statusFilter !== "ALL" ||
                                         priorityFilter !== "ALL"
@@ -662,7 +681,7 @@ export default function ProjectDetailsPage() {
 
                             {/* Task table */}
                             {tasksLoading && (
-                                <div className="mt-4 overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)]">
+                                <div className="mt-4 overflow-x-auto rounded-xl border border-[var(--border)] bg-[var(--surface)]">
                                     <div className="divide-y divide-[var(--border)]">
                                         {[1, 2, 3].map((item) => (
                                             <div
@@ -689,16 +708,23 @@ export default function ProjectDetailsPage() {
                                     role="alert"
                                     className="mt-4 rounded-xl border border-red-200 bg-red-50 p-5 text-sm text-red-700"
                                 >
-                                    {tasksError}
+                                    <p>{tasksError}</p>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => window.location.reload()}
+                                        className="mt-3 inline-flex items-center rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-sm font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--surface-subtle)]"
+                                    >
+                                        Try Again
+                                    </button>
                                 </div>
                             )}
 
                             {!tasksLoading && !tasksError && filteredTasks.length === 0 && (
                                 <div className="mt-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-10 text-center">
-                                    <CheckCircle2
-                                        size={32}
-                                        className="mx-auto mb-3 text-[var(--text-muted)]"
-                                    />
+                                    <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-[var(--surface-subtle)] text-[var(--text-muted)]">
+                                        <CheckCircle2 size={24} />
+                                    </div>
 
                                     <h2 className="text-base font-semibold">
                                         {tasks.length === 0
@@ -706,11 +732,40 @@ export default function ProjectDetailsPage() {
                                             : "No matching tasks"}
                                     </h2>
 
-                                    <p className="mt-1 text-sm text-[var(--text-secondary)]">
+                                    <p className="mx-auto mt-1 max-w-md text-sm leading-6 text-[var(--text-secondary)]">
                                         {tasks.length === 0
-                                            ? "Add a task to start organizing work in this project."
-                                            : "Try adjusting your search or filters."}
+                                            ? "Add your first task to start organizing and tracking work in this project."
+                                            : "No tasks match your current search and filters. Try changing your criteria."}
                                     </p>
+
+                                    {tasks.length === 0 ? (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setTaskFormError("");
+                                                setTaskTitle("");
+                                                setTaskDescription("");
+                                                setTaskPriority("MEDIUM");
+                                                setTaskDueDate("");
+                                                setCreateTaskModalOpen(true);
+                                            }}
+                                            className="mt-5 inline-flex items-center justify-center rounded-lg bg-[var(--primary)] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--primary-hover)]"
+                                        >
+                                            Add your first task
+                                        </button>
+                                    ) : (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setSearch("");
+                                                setStatusFilter("ALL");
+                                                setPriorityFilter("ALL");
+                                            }}
+                                            className="mt-5 inline-flex items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-sm font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--surface-subtle)]"
+                                        >
+                                            Clear search and filters
+                                        </button>
+                                    )}
                                 </div>
                             )}
 
@@ -817,7 +872,7 @@ export default function ProjectDetailsPage() {
                                 role="dialog"
                                 aria-modal="true"
                                 aria-labelledby="create-task-title"
-                                className="relative z-10 w-full max-w-lg rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-6 shadow-xl sm:p-7"
+                                className="relative z-10 max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-xl sm:p-7"
                             >
                                 <div className="mb-5">
                                     <h2

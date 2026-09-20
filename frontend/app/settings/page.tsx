@@ -212,7 +212,7 @@ export default function SettingsPage() {
     return (
         <ProtectedRoute>
             <AppShell>
-                <div className="mx-auto max-w-5xl">
+                <div className="w-full mx-auto max-w-5xl">
                     <div className="mb-8">
                         <h1 className="text-2xl font-bold tracking-tight">
                             Settings
@@ -226,7 +226,7 @@ export default function SettingsPage() {
                     <div className="space-y-6">
                         {/* Profile */}
                         <section className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
-                            <div className="border-b border-[var(--border)] px-6 py-5">
+                            <div className="border-b border-[var(--border)] px-5 py-5 sm:px-6">
                                 <div className="flex items-center gap-3">
                                     <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--surface-subtle)] text-[var(--primary)]">
                                         <UserCircle size={20} />
@@ -246,7 +246,7 @@ export default function SettingsPage() {
 
                             <form
                                 onSubmit={handleProfileSubmit}
-                                className="space-y-5 p-6"
+                                className="space-y-5 p-5 sm:p-6"
                             >
                                 {profileError && (
                                     <div
@@ -369,7 +369,7 @@ export default function SettingsPage() {
                                     <button
                                         type="submit"
                                         disabled={profileLoading}
-                                        className="inline-flex items-center gap-2 rounded-xl bg-[var(--primary)] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--primary-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+                                        className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--primary)] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--primary-hover)] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
                                     >
                                         <Save size={16} />
 
@@ -383,7 +383,7 @@ export default function SettingsPage() {
 
                         {/* Security */}
                         <section className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
-                            <div className="border-b border-[var(--border)] px-6 py-5">
+                            <div className="border-b border-[var(--border)] px-5 py-5 sm:px-6">
                                 <div className="flex items-center gap-3">
                                     <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--surface-subtle)] text-[var(--primary)]">
                                         <LockKeyhole size={20} />
@@ -577,7 +577,7 @@ export default function SettingsPage() {
                                     <button
                                         type="submit"
                                         disabled={passwordLoading}
-                                        className="inline-flex items-center gap-2 rounded-xl bg-[var(--primary)] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--primary-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+                                        className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--primary)] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--primary-hover)] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
                                     >
                                         <LockKeyhole size={16} />
 

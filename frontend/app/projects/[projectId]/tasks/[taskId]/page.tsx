@@ -335,7 +335,7 @@ export default function TaskDetailsPage() {
     return (
         <ProtectedRoute>
             <AppShell>
-                <div className="mx-auto max-w-4xl">
+                <div className="w-full max-w-4xl mx-auto">
                     <div className="mb-6">
                         <Link
                             href={`/projects/${projectId}`}
@@ -382,7 +382,7 @@ export default function TaskDetailsPage() {
                         !error &&
                         task && (
                             <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
-                                <div className="border-b border-[var(--border)] p-6">
+                                <div className="border-b border-[var(--border)] p-5 sm:p-6">
                                     <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                                         <div className="min-w-0">
                                             <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
@@ -427,7 +427,7 @@ export default function TaskDetailsPage() {
                                     </div>
                                 </div>
 
-                                <div className="p-6">
+                                <div className="p-5 sm:p-6">
                                     <div>
                                         <h2 className="text-sm font-semibold">
                                             Description
@@ -481,7 +481,7 @@ export default function TaskDetailsPage() {
                         )}
 
                     <div className="mt-6 rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
-                        <div className="border-b border-[var(--border)] px-6 py-5">
+                        <div className="border-b border-[var(--border)] px-5 py-5 sm:px-6">
                             <h2 className="text-lg font-semibold">
                                 Comments
                             </h2>
@@ -491,7 +491,7 @@ export default function TaskDetailsPage() {
                             </p>
                         </div>
 
-                        <div className="p-6">
+                        <div className="p-5 sm:p-6">
                             {commentsLoading && (
                                 <div className="space-y-4">
                                     {[1, 2].map((item) => (
@@ -616,7 +616,7 @@ export default function TaskDetailsPage() {
                     </div>
 
                     <div className="mt-6 rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
-                        <div className="border-b border-[var(--border)] px-6 py-5">
+                        <div className="border-b border-[var(--border)] px-5 py-5 sm:px-6">
                             <h2 className="text-lg font-semibold">
                                 Activity
                             </h2>
@@ -626,7 +626,7 @@ export default function TaskDetailsPage() {
                             </p>
                         </div>
 
-                        <div className="p-6">
+                        <div className="p-5 sm:p-6">
                             {activitiesLoading && (
                                 <div className="space-y-6">
                                     {[1, 2, 3].map((item) => (
@@ -737,7 +737,7 @@ export default function TaskDetailsPage() {
                                 role="dialog"
                                 aria-modal="true"
                                 aria-labelledby="edit-task-title"
-                                className="relative z-10 w-full max-w-lg rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-6 shadow-xl sm:p-7"
+                                className="relative z-10 max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-xl sm:p-7"
                             >
                                 <div className="mb-5">
                                     <h2

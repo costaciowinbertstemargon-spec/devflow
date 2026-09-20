@@ -178,7 +178,7 @@ export default function ProjectsPage() {
                                 setProjectDescription("");
                                 setCreateModalOpen(true);
                             }}
-                            className="inline-flex items-center justify-center gap-2 rounded-lg bg-[var(--primary)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[var(--primary-hover)]"
+                            className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--primary)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[var(--primary-hover)] sm:w-auto"
                         >
                             <Plus size={17} />
                             New Project
@@ -272,35 +272,49 @@ export default function ProjectsPage() {
                     )}
 
                     {/* Empty state */}
-                    {!loading &&
-                        !error &&
-                        activeOrganization &&
-                        filteredProjects.length === 0 && (
-                            <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-10 text-center">
-                                <FolderKanban
-                                    size={32}
-                                    className="mx-auto mb-3 text-[var(--text-muted)]"
-                                />
-
-                                <h2 className="text-base font-semibold">
-                                    {search
-                                        ? "No projects found"
-                                        : "No projects yet"}
-                                </h2>
-
-                                <p className="mt-1 text-sm text-[var(--text-secondary)]">
-                                    {search
-                                        ? "Try a different search term."
-                                        : "Create your first project to get started."}
-                                </p>
+                    {!loading && !error && filteredProjects.length === 0 && (
+                        <div className="mt-6 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-10 text-center">
+                            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-[var(--surface-subtle)] text-[var(--text-muted)]">
+                                <FolderKanban size={24} />
                             </div>
-                        )}
+
+                            <h2 className="text-base font-semibold">
+                                {projects.length === 0
+                                    ? "No projects yet"
+                                    : "No matching projects"}
+                            </h2>
+
+                            <p className="mx-auto mt-1 max-w-md text-sm leading-6 text-[var(--text-secondary)]">
+                                {projects.length === 0
+                                    ? "Create your first project to start organizing work with your team."
+                                    : "No projects match your current search. Try a different keyword."}
+                            </p>
+
+                            {projects.length === 0 ? (
+                                <button
+                                    type="button"
+                                    onClick={() => setCreateModalOpen(true)}
+                                    className="mt-5 inline-flex items-center justify-center rounded-lg bg-[var(--primary)] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--primary-hover)]"
+                                >
+                                    Create your first project
+                                </button>
+                            ) : (
+                                <button
+                                    type="button"
+                                    onClick={() => setSearch("")}
+                                    className="mt-5 inline-flex items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-sm font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--surface-subtle)]"
+                                >
+                                    Clear search
+                                </button>
+                            )}
+                        </div>
+                    )}
 
                     {/* Projects table */}
                     {!loading &&
                         !error &&
                         filteredProjects.length > 0 && (
-                            <div className="overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)]">
+                            <div className="overflow-x-auto rounded-xl border border-[var(--border)] bg-[var(--surface)]">
                                 <div className="hidden border-b border-[var(--border)] px-5 py-3 text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)] md:grid md:grid-cols-[minmax(0,2fr)_160px_180px] md:gap-4">
                                     <div>
                                         Project
@@ -321,7 +335,7 @@ export default function ProjectsPage() {
                                             <Link
                                                 key={project.id}
                                                 href={`/projects/${project.id}`}
-                                                className="grid w-full gap-4 px-5 py-5 text-left transition hover:bg-[var(--surface-subtle)] md:grid-cols-[minmax(0,2fr)_160px_180px] md:items-center"
+                                               className="grid w-full gap-3 px-4 py-4 text-left transition hover:bg-[var(--surface-subtle)] sm:px-5 sm:py-5 md:grid-cols-[minmax(0,2fr)_160px_180px] md:items-center"
                                             >
                                                 <div className="flex min-w-0 items-start gap-3">
                                                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--surface-subtle)] text-[var(--primary)]">
@@ -339,7 +353,7 @@ export default function ProjectsPage() {
                                                             }
                                                         </p>
 
-                                                        <p className="mt-1 truncate text-sm text-[var(--text-secondary)]">
+                                                        <p className="mt-1 line-clamp-2 text-sm leading-5 text-[var(--text-secondary)]">
                                                             {project.description ??
                                                                 "No description provided."}
                                                         </p>

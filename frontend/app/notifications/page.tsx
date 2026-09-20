@@ -66,7 +66,7 @@ export default function NotificationsPage() {
                                 onClick={() =>
                                     void markAllAsRead()
                                 }
-                                className="inline-flex items-center justify-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-sm font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--surface-subtle)]"
+                                className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-sm font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--surface-subtle)] sm:w-auto"
                             >
                                 <CheckCheck size={16} />
                                 Mark all as read
@@ -131,7 +131,7 @@ export default function NotificationsPage() {
                                             key={
                                                 notification.id
                                             }
-                                            className={`border-b border-[var(--border)] p-5 last:border-b-0 ${
+                                            className={`border-b border-[var(--border)] p-4 sm:p-5 last:border-b-0 ${
                                                 !notification.isRead
                                                     ? "bg-[var(--surface-subtle)]/50"
                                                     : ""
@@ -161,7 +161,7 @@ export default function NotificationsPage() {
                                                         )}
                                                     </div>
 
-                                                    <p className="mt-1 text-sm leading-6 text-[var(--text-primary)]">
+                                                    <p className="mt-1 break-words text-sm leading-6 text-[var(--text-primary)]">
                                                         {
                                                             notification.message
                                                         }

@@ -262,7 +262,7 @@ export default function MembersPage() {
                                     setRole("MEMBER");
                                     setAddMemberOpen(true);
                                 }}
-                                className="inline-flex items-center justify-center gap-2 rounded-lg bg-[var(--primary)] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--primary-hover)]"
+                                className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--primary)] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--primary-hover)] sm:w-auto"
                             >
                                 <UserPlus size={17} />
                                 Add Member
@@ -427,7 +427,7 @@ export default function MembersPage() {
                                                         key={
                                                             member.id
                                                         }
-                                                        className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between"
+                                                        className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5 sm:py-5"
                                                     >
                                                         <div className="flex min-w-0 items-center gap-3">
                                                             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--surface-subtle)] text-xs font-bold text-[var(--primary)]">
@@ -511,7 +511,7 @@ export default function MembersPage() {
                                 role="dialog"
                                 aria-modal="true"
                                 aria-labelledby="add-member-title"
-                                className="relative z-10 w-full max-w-lg rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-6 shadow-xl sm:p-7"
+                                className="relative z-10 max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-xl sm:p-7"
                             >
                                 <div className="mb-6">
                                     <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--primary)]/10 text-[var(--primary)]">

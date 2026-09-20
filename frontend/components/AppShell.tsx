@@ -14,7 +14,7 @@ import {
     Users,
 } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "./AuthProvider";
 import { useOrganization } from "./OrganizationProvider";
 import { useNotifications } from "./NotificationProvider";
@@ -64,6 +64,29 @@ export default function AppShell({
         loading: organizationLoading,
     } = useOrganization();
 
+    useEffect(() => {
+        setSidebarOpen(false);
+        setOrganizationMenuOpen(false);
+    }, [pathname]);
+
+    useEffect(() => {
+        function handleKeyDown(event: KeyboardEvent) {
+            if (event.key === "Escape") {
+                setSidebarOpen(false);
+                setOrganizationMenuOpen(false);
+            }
+        }
+
+        window.addEventListener("keydown", handleKeyDown);
+
+        return () => {
+            window.removeEventListener(
+                "keydown",
+                handleKeyDown
+            );
+        };
+    }, []);
+
     return (
         <div className="min-h-screen bg-[var(--background)] text-[var(--text-primary)]">
             {/* Mobile overlay */}
@@ -72,14 +95,14 @@ export default function AppShell({
                     type="button"
                     aria-label="Close navigation"
                     onClick={() => setSidebarOpen(false)}
-                    className="fixed inset-0 z-40 bg-black/20 lg:hidden"
-                />
+                    className="fixed inset-0 z-40 bg-black/30 backdrop-blur-[1px] lg:hidden"
+            />
             )}
 
             {/* Sidebar */}
             <aside
-                className={`fixed inset-y-0 left-0 z-50 flex w-64 flex-col border-r border-[var(--border)] bg-[var(--surface)] transition-transform duration-200 lg:translate-x-0 ${
-                    sidebarOpen
+                className={`fixed inset-y-0 left-0 z-50 flex w-72 max-w-[85vw] flex-col border-r border-[var(--border)] bg-[var(--surface)] shadow-xl transition-transform duration-200 lg:w-64 lg:shadow-none lg:translate-x-0 ${
+                        sidebarOpen
                         ? "translate-x-0"
                         : "-translate-x-full"
                 }`}
@@ -214,7 +237,7 @@ export default function AppShell({
                 </div>
 
                 {/* Navigation */}
-                <nav className="flex-1 p-3">
+                <nav className="min-h-0 flex-1 overflow-y-auto p-3">
                     <p className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
                         Workspace
                     </p>
@@ -353,11 +376,14 @@ export default function AppShell({
                         <button
                             type="button"
                             aria-label="Notifications"
+                            onClick={() => router.push("/notifications")}
                             className="relative rounded-lg p-2 text-[var(--text-secondary)] transition hover:bg-[var(--surface-subtle)]"
                         >
                             <Bell size={20} />
 
-                            <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-[var(--danger)]" />
+                            {unreadCount > 0 && (
+                                <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-[var(--danger)]" />
+                            )}
                         </button>
 
                         <button
@@ -381,7 +407,7 @@ export default function AppShell({
                 </header>
 
                 {/* Page content */}
-                <main className="min-h-[calc(100vh-4rem)] p-4 sm:p-6 lg:p-8">
+                <main className="min-h-[calc(100vh-4rem)] min-w-0 overflow-x-hidden p-4 sm:p-6 lg:p-8">
                     {children}
                 </main>
             </div>
