@@ -2,10 +2,12 @@
 
 import AppShell from "@/components/AppShell";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import { useAuth } from "@/components/AuthProvider";
 import { 
     createTask,
     getProject,
-    getTasks, 
+    getTasks,
+    getOrganization, 
     type Project,
     type Task,
 } from "@/lib/api";
@@ -43,6 +45,9 @@ export default function ProjectDetailsPage() {
     const projectId = params.projectId as string;
     const router = useRouter();
 
+    const { user } = useAuth();
+    const [canManageTasks, setCanManageTasks] = useState(false);
+
     const [project, setProject] = useState<Project | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
@@ -55,7 +60,6 @@ export default function ProjectDetailsPage() {
     const [taskTitle, setTaskTitle] = useState("");
     const [taskDescription, setTaskDescription] = useState("");
     const [taskPriority, setTaskPriority] = useState("MEDIUM");
-    const [taskStatus, setTaskStatus] = useState("TODO");
     const [taskDueDate, setTaskDueDate] = useState("");
     const [savingTask, setSavingTask] = useState(false);
     const [taskFormError, setTaskFormError] = useState("");
@@ -114,6 +118,20 @@ export default function ProjectDetailsPage() {
 
                 setProject(projectResult);
                 setTasks(tasksResult);
+
+                const organization = await getOrganization(
+                    projectResult.organizationId,
+                    token
+                );
+
+                const membership = organization.members.find(
+                    (member) => member.userId === user?.id
+                );
+
+                setCanManageTasks(
+                    membership?.role === "OWNER" ||
+                    membership?.role === "ADMIN"
+                );
             } catch (error) {
                 const message =
                     error instanceof Error
@@ -398,7 +416,7 @@ export default function ProjectDetailsPage() {
                                     <div className="flex items-center gap-2">
                                         <button
                                             type="button"
-                                            className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2.5 text-sm font-medium text-[var(--text-secondary)] transition hover:bg-[var(--surface-subtle)] hover:text-[var(--text-primary)]"
+                                            className="inline-flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2.5 text-sm font-medium text-[var(--text-secondary)] transition hover:bg-[var(--surface-subtle)] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2"
                                         >
                                             <Users size={16} />
                                             Members
@@ -406,7 +424,7 @@ export default function ProjectDetailsPage() {
 
                                         <button
                                             type="button"
-                                            className="rounded-lg p-2.5 text-[var(--text-secondary)] transition hover:bg-[var(--surface-subtle)]"
+                                            className="rounded-lg p-2.5 text-[var(--text-secondary)] transition hover:bg-[var(--surface-subtle)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2"
                                             aria-label="Project options"
                                         >
                                             <MoreHorizontal size={19} />
@@ -483,21 +501,23 @@ export default function ProjectDetailsPage() {
                                     </button>
                                 </div>
 
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setTaskFormError("");
-                                        setTaskTitle("");
-                                        setTaskDescription("");
-                                        setTaskPriority("MEDIUM");
-                                        setTaskDueDate("");
-                                        setCreateTaskModalOpen(true);
-                                    }}
-                                    className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--primary)] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--primary-hover)]"
-                                >
-                                    <Plus size={17} />
-                                    Add Task
-                                </button>
+                                {canManageTasks && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setTaskFormError("");
+                                            setTaskTitle("");
+                                            setTaskDescription("");
+                                            setTaskPriority("MEDIUM");
+                                            setTaskDueDate("");
+                                            setCreateTaskModalOpen(true);
+                                        }}
+                                        className="inline-flex items-center justify-center gap-2 rounded-lg bg-[var(--primary)] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--primary-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2"
+                                    >
+                                        <Plus size={17} />
+                                        Add Task
+                                    </button>
+                                )}
                             </div>
 
                             {/* Search and filter */}
@@ -515,7 +535,7 @@ export default function ProjectDetailsPage() {
                                             setSearch(event.target.value)
                                         }
                                         placeholder="Search tasks..."
-                                        className="h-11 w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] pl-10 pr-4 text-sm outline-none transition placeholder:text-[var(--text-muted)] focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--accent)]/20"
+                                        className="h-11 w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] pl-10 pr-4 text-sm outline-none transition placeholder:text-[var(--text-muted)] focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--accent)]/20 focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
                                     />
                                 </div>
 
@@ -532,7 +552,7 @@ export default function ProjectDetailsPage() {
                                         priorityFilter !== "ALL"
                                             ? "border-[var(--primary)] bg-[var(--primary)]/5 text-[var(--primary)]"
                                             : "border-[var(--border)] bg-[var(--surface)] text-[var(--text-secondary)] hover:bg-[var(--surface-subtle)]"
-                                    }`}                                
+                                    }focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2`}                             
                                 >
                                     <Filter size={16} />
                                     Filters
@@ -787,7 +807,7 @@ export default function ProjectDetailsPage() {
                                                 onClick={() => router.push(
                                                     `/projects/${projectId}/tasks/${task.id}`
                                                 )}
-                                                className="grid w-full gap-4 px-5 py-4 text-left transition hover:bg-[var(--surface-subtle)] md:grid-cols-[minmax(0,2fr)_150px_110px_100px_40px] md:items-center"
+                                                className="grid w-full gap-4 px-5 py-4 text-left transition hover:bg-[var(--surface-subtle)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--primary)] md:grid-cols-[minmax(0,2fr)_150px_110px_100px_40px] md:items-center"
                                             >
                                                 <div className="min-w-0">
                                                     <p className="truncate text-sm font-semibold">

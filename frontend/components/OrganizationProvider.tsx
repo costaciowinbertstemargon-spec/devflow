@@ -6,6 +6,7 @@ import {
     useEffect,
     useState,
 } from "react";
+import { useAuth } from "./AuthProvider";
 import {
     getOrganizations,
     type Organization,
@@ -15,6 +16,7 @@ import { getToken } from "@/lib/auth";
 interface OrganizationContextValue {
     organizations: Organization[];
     activeOrganization: Organization | null;
+    activeOrganizationRole: "OWNER" | "ADMIN" | "MEMBER" | null;
     loading: boolean;
     setActiveOrganization: (
         organization: Organization
@@ -40,6 +42,9 @@ export function OrganizationProvider({
 
     const [activeOrganization, setActiveOrganizationState] =
         useState<Organization | null>(null);
+
+    const [activeOrganizationRole, setActiveOrganizationRole] =
+        useState<"OWNER" | "ADMIN" | "MEMBER" | null>(null);
 
     const [loading, setLoading] = useState(true);
 
@@ -115,6 +120,7 @@ export function OrganizationProvider({
             value={{
                 organizations,
                 activeOrganization,
+                activeOrganizationRole,
                 loading,
                 setActiveOrganization,
                 refreshOrganizations,

@@ -2,8 +2,9 @@
 
 import AppShell from "@/components/AppShell";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import { useAuth } from "@/components/AuthProvider";
 import { useOrganization } from "@/components/OrganizationProvider";
-import { createProject, getProjects, type Project } from "@/lib/api";
+import { createProject, getProjects, getOrganization, type Project } from "@/lib/api";
 import { getToken } from "@/lib/auth";
 import {
     FolderKanban,
@@ -23,6 +24,8 @@ export default function ProjectsPage() {
         activeOrganization,
         loading: organizationLoading,
     } = useOrganization();
+    const { user } = useAuth();
+    const [canCreateProject, setCanCreateProject] = useState(false);
 
     const [projects, setProjects] = useState<Project[]>([]);
     const [loading, setLoading] = useState(true);
@@ -76,6 +79,58 @@ export default function ProjectsPage() {
     }, [
         activeOrganization,
         organizationLoading,
+    ]);
+
+    useEffect(() => {
+        async function loadOrganizationPermission() {
+            if (
+                organizationLoading ||
+                !activeOrganization ||
+                !user
+            ) {
+                setCanCreateProject(false);
+                return;
+            }
+
+            const token = getToken();
+
+            if (!token) {
+                setCanCreateProject(false);
+                return;
+            }
+
+            try {
+                const organization =
+                    await getOrganization(
+                        activeOrganization.id,
+                        token
+                    );
+
+                const membership =
+                    organization.members.find(
+                        (member) =>
+                            member.userId === user.id
+                    );
+
+                setCanCreateProject(
+                    membership?.role === "OWNER" ||
+                    membership?.role === "ADMIN"
+                );
+            } catch (error) {
+                console.error(
+                    "Failed to determine project permission:",
+                    error
+                );
+
+                setCanCreateProject(false);
+            }
+        }
+
+        void loadOrganizationPermission();
+    }, [
+        activeOrganization,
+        organizationLoading,
+        user,
     ]);
 
     async function handleCreateProject(
@@ -170,19 +225,21 @@ export default function ProjectsPage() {
                             </p>
                         </div>
 
-                        <button
-                            type="button"
-                            onClick={() =>{
-                                setCreateError("");
-                                setProjectName("");
-                                setProjectDescription("");
-                                setCreateModalOpen(true);
-                            }}
-                            className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--primary)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[var(--primary-hover)] sm:w-auto"
-                        >
-                            <Plus size={17} />
-                            New Project
-                        </button>
+                        {canCreateProject && (
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setCreateError("");
+                                    setProjectName("");
+                                    setProjectDescription("");
+                                    setCreateModalOpen(true);
+                                }}
+                                className="inline-flex items-center justify-center gap-2 rounded-lg bg-[var(--primary)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[var(--primary-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2"
+                            >
+                                <Plus size={17} />
+                                New Project
+                            </button>
+                        )}                    
                     </div>
 
                     {/* Search */}
@@ -202,7 +259,7 @@ export default function ProjectsPage() {
                                     )
                                 }
                                 placeholder="Search projects..."
-                                className="h-11 w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] pl-10 pr-4 text-sm outline-none transition placeholder:text-[var(--text-muted)] focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--accent)]/20"
+                               className="h-11 w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] pl-10 pr-4 text-sm outline-none transition placeholder:text-[var(--text-muted)] focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--accent)]/20 focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
                             />
                         </div>
                     </div>
@@ -335,7 +392,7 @@ export default function ProjectsPage() {
                                             <Link
                                                 key={project.id}
                                                 href={`/projects/${project.id}`}
-                                               className="grid w-full gap-3 px-4 py-4 text-left transition hover:bg-[var(--surface-subtle)] sm:px-5 sm:py-5 md:grid-cols-[minmax(0,2fr)_160px_180px] md:items-center"
+                                                className="grid w-full gap-4 px-5 py-5 text-left transition hover:bg-[var(--surface-subtle)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--primary)] md:grid-cols-[minmax(0,2fr)_160px_180px] md:items-center"
                                             >
                                                 <div className="flex min-w-0 items-start gap-3">
                                                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--surface-subtle)] text-[var(--primary)]">

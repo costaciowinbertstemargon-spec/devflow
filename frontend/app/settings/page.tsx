@@ -285,7 +285,7 @@ export default function SettingsPage() {
                                                     event.target.value
                                                 )
                                             }
-                                            className="h-11 w-full rounded-xl border border-[var(--border)] bg-white px-4 text-sm outline-none transition focus:border-[var(--primary)] focus:ring-4 focus:ring-[var(--accent)]/10"
+                                            className="h-11 w-full rounded-xl border border-[var(--border)] bg-white px-4 text-sm outline-none transition focus:border-[var(--primary)] focus:ring-4 focus:ring-[var(--accent)]/10 focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
                                             required
                                         />
                                     </div>
@@ -307,7 +307,7 @@ export default function SettingsPage() {
                                                     event.target.value
                                                 )
                                             }
-                                            className="h-11 w-full rounded-xl border border-[var(--border)] bg-white px-4 text-sm outline-none transition focus:border-[var(--primary)] focus:ring-4 focus:ring-[var(--accent)]/10"
+                                            className="h-11 w-full rounded-xl border border-[var(--border)] bg-white px-4 text-sm outline-none transition focus:border-[var(--primary)] focus:ring-4 focus:ring-[var(--accent)]/10 focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
                                             required
                                         />
                                     </div>
@@ -349,7 +349,7 @@ export default function SettingsPage() {
                                                     !showProfilePassword
                                                 )
                                             }
-                                            className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-[var(--text-muted)] transition hover:bg-[var(--surface-subtle)] hover:text-[var(--text-primary)]"
+                                            className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-[var(--text-muted)] transition hover:bg-[var(--surface-subtle)] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2"
                                             aria-label={
                                                 showProfilePassword
                                                     ? "Hide password"
@@ -369,7 +369,7 @@ export default function SettingsPage() {
                                     <button
                                         type="submit"
                                         disabled={profileLoading}
-                                        className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--primary)] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--primary-hover)] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+                                        className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--primary)] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--primary-hover)] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2"
                                     >
                                         <Save size={16} />
 
@@ -458,7 +458,7 @@ export default function SettingsPage() {
                                                         !showCurrentPassword
                                                     )
                                                 }
-                                                className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-[var(--text-muted)] transition hover:bg-[var(--surface-subtle)] hover:text-[var(--text-primary)]"
+                                                className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-[var(--text-muted)] transition hover:bg-[var(--surface-subtle)] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2"
                                                 aria-label={
                                                     showCurrentPassword
                                                         ? "Hide password"
@@ -507,7 +507,7 @@ export default function SettingsPage() {
                                                         !showNewPassword
                                                     )
                                                 }
-                                                className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-[var(--text-muted)] transition hover:bg-[var(--surface-subtle)] hover:text-[var(--text-primary)]"
+                                                className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-[var(--text-muted)] transition hover:bg-[var(--surface-subtle)] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2"
                                                 aria-label={
                                                     showNewPassword
                                                         ? "Hide password"
@@ -556,7 +556,7 @@ export default function SettingsPage() {
                                                         !showConfirmPassword
                                                     )
                                                 }
-                                                className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-[var(--text-muted)] transition hover:bg-[var(--surface-subtle)] hover:text-[var(--text-primary)]"
+                                                className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-[var(--text-muted)] transition hover:bg-[var(--surface-subtle)] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2"
                                                 aria-label={
                                                     showConfirmPassword
                                                         ? "Hide password"

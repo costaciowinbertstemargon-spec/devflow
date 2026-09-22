@@ -2,9 +2,11 @@
 
 import AppShell from "@/components/AppShell";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import { useAuth } from "@/components/AuthProvider";
 import {
     createComment,
     getTask,
+    getOrganization,
     getTaskActivities,
     getTaskComments,
     updateTask,
@@ -85,6 +87,9 @@ export default function TaskDetailsPage() {
     const projectId = params.projectId as string;
     const taskId = params.taskId as string;
 
+    const { user } = useAuth();
+    const [canEditTask, setCanEditTask] = useState(false);
+
     const [task, setTask] = useState<Task | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
@@ -151,6 +156,22 @@ export default function TaskDetailsPage() {
                 setTask(taskResult);
                 setComments(commentsResult);
                 setActivities(activitiesResult);
+
+                const organization =
+                    await getOrganization(
+                        taskResult.project?.organizationId ?? "",
+                        token
+                    );
+
+                const membership =
+                    organization.members.find(
+                        (member) => member.userId === user?.id
+                    );
+
+                setCanEditTask(
+                    membership?.role === "OWNER" ||
+                    membership?.role === "ADMIN"
+                );
             } catch (error) {
                 const message =
                     error instanceof Error
@@ -339,7 +360,7 @@ export default function TaskDetailsPage() {
                     <div className="mb-6">
                         <Link
                             href={`/projects/${projectId}`}
-                            className="inline-flex items-center gap-2 text-sm font-medium text-[var(--text-secondary)] transition hover:text-[var(--primary)]"
+                            className="inline-flex items-center gap-2 text-sm font-medium text-[var(--text-secondary)] transition hover:text-[var(--primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2"
                         >
                             <ArrowLeft size={16} />
                             Back to Project
@@ -393,15 +414,16 @@ export default function TaskDetailsPage() {
                                                 {task.title}
                                             </h1>
                                         </div>
-
-                                        <button
-                                            type="button"
-                                            onClick={openEditTask}
-                                            className="inline-flex items-center justify-center gap-2 rounded-lg border border-[var(--border)] px-3.5 py-2.5 text-sm font-medium text-[var(--text-secondary)] transition hover:bg-[var(--surface-subtle)]"
-                                        >
-                                            <Pencil size={16} />
-                                            Edit
-                                        </button>
+                                        {canEditTask && (
+                                            <button
+                                                type="button"
+                                                onClick={openEditTask}
+                                                className="inline-flex items-center justify-center gap-2 rounded-lg border border-[var(--border)] px-3.5 py-2.5 text-sm font-medium text-[var(--text-secondary)] transition hover:bg-[var(--surface-subtle)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2"
+                                            >
+                                                <Pencil size={16} />
+                                                Edit
+                                            </button>
+                                        )}
                                     </div>
 
                                     <div className="mt-6 flex flex-wrap gap-3">
@@ -594,7 +616,7 @@ export default function TaskDetailsPage() {
                                     }
                                     rows={4}
                                     placeholder="Write a comment..."
-                                    className="w-full resize-none rounded-xl border border-[var(--border)] bg-white px-4 py-3 text-sm outline-none transition placeholder:text-[var(--text-muted)] focus:border-[var(--primary)] focus:ring-4 focus:ring-[var(--accent)]/10"
+                                    className="w-full resize-none rounded-xl border border-[var(--border)] bg-white px-4 py-3 text-sm outline-none transition placeholder:text-[var(--text-muted)] focus:border-[var(--primary)] focus:ring-4 focus:ring-[var(--accent)]/10 focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
                                 />
 
                                 <div className="mt-3 flex justify-end">
@@ -604,7 +626,7 @@ export default function TaskDetailsPage() {
                                             submittingComment ||
                                             !commentText.trim()
                                         }
-                                        className="rounded-lg bg-[var(--primary)] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--primary-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+                                        className="rounded-lg bg-[var(--primary)] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--primary-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
                                     >
                                         {submittingComment
                                             ? "Posting..."
@@ -903,7 +925,7 @@ export default function TaskDetailsPage() {
                                             onClick={() =>
                                                 setEditTaskModalOpen(false)
                                             }
-                                            className="rounded-xl border border-[var(--border)] px-4 py-2.5 text-sm font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--surface-subtle)]"
+                                            className="rounded-xl border border-[var(--border)] px-4 py-2.5 text-sm font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--surface-subtle)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2"
                                         >
                                             Cancel
                                         </button>
@@ -914,7 +936,7 @@ export default function TaskDetailsPage() {
                                                 savingTask ||
                                                 !taskTitle.trim()
                                             }
-                                            className="inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--primary)] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--primary-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+                                            className="inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--primary)] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--primary-hover)] disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2"
                                         >
                                             {savingTask
                                                 ? "Saving..."

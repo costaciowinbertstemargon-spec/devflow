@@ -18,7 +18,7 @@ router.post(
 router.get(
     "/organizations/:organizationId/projects",
     authenticate,
-    requireOrganizationRole(["OWNER", "ADMIN"]),
+    requireOrganizationRole(["OWNER", "ADMIN", "MEMBER"]),
     getProjects
 );
 

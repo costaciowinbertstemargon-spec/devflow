@@ -256,6 +256,7 @@ export default function AppShell({
                                 <button
                                     key={item.label}
                                     type="button"
+                                    aria-current={active ? "page" : undefined}
                                     onClick={() => {
                                         setSidebarOpen(false);
 
@@ -279,7 +280,7 @@ export default function AppShell({
                                             router.push("/notifications");
                                         }                                        
                                     }}
-                                    className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition ${
+                                    className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2 ${
                                         active
                                             ? "bg-[var(--surface-subtle)] text-[var(--primary)]"
                                             : "text-[var(--text-secondary)] hover:bg-[var(--surface-subtle)] hover:text-[var(--text-primary)]"
@@ -305,11 +306,16 @@ export default function AppShell({
                 <div className="border-t border-[var(--border)] p-3">
                     <button
                         type="button"
+                        aria-current={
+                            pathname === "/settings"
+                                ? "page"
+                                : undefined
+                        }
                         onClick={() => {
                             setSidebarOpen(false);
                             router.push("/settings");
                         }}
-                        className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition ${
+                        className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2 ${
                             pathname === "/settings"
                                 ? "bg-[var(--surface-subtle)] font-medium text-[var(--primary)]"
                                 : "text-[var(--text-secondary)] hover:bg-[var(--surface-subtle)] hover:text-[var(--text-primary)]"
