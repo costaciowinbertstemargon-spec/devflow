@@ -1,6 +1,6 @@
 import type { Response } from "express";
 import type { AuthenticatedRequest } from "../middleware/auth.middleware.js";
-import { createOrganization, getOrganizationById, getOrganizationsByUser} from "../services/organization.service.js";
+import { createOrganization, getOrganizationById, getOrganizationsByUser, updateOrganization} from "../services/organization.service.js";
 import { addOrganizationMember } from "../services/organization_member.service.js";
 import type { OrganizationRequest } from "../middleware/organization.middleware.js";
 
@@ -140,6 +140,43 @@ export async function getOrganization(
             message: "Failed to retrieve organization",
         });
    }
+}
+
+export async function updateOrganizationController(
+    req: OrganizationRequest,
+    res: Response
+) {
+    try {
+        if (!req.organization) {
+            return res.status(403).json({
+                status: "error",
+                message: "Organization access required",
+            });
+        }
+
+        const { name, description } = req.body;
+
+        const organization = await updateOrganization(
+            req.organization.id,
+            {
+                name,
+                description,
+            }
+        );
+
+        return res.status(200).json({
+            status: "success",
+            message: "Organization updated successfully",
+            organization,
+        });
+    } catch (error) {
+        console.error(error);
+
+        return res.status(500).json({
+            status: "error",
+            message: "Failed to update organization",
+        });
+    }
 }
 
 export async function getMyOrganizations(

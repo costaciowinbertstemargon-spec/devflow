@@ -248,6 +248,58 @@ export async function getOrganizations(
     return data.organizations;
 }
 
+/* Creating Organization */
+
+export interface CreateOrganizationResponse {
+    status: string;
+    message?: string;
+    organization: Organization;
+}
+
+export async function createOrganization(
+    token: string,
+    name: string,
+    description?: string
+): Promise<Organization> {
+    const response = await fetch(
+        `${API_URL}/organizations`,
+        {
+            method: "POST",
+            headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                name,
+                ...(description?.trim()
+                    ? {
+                          description: description.trim(),
+                      }
+                    : {}),
+            }),
+            cache: "no-store",
+        }
+    );
+
+    const data =
+        (await response.json()) as CreateOrganizationResponse;
+
+    if (!response.ok) {
+        throw new Error(
+            data.message ||
+                "Failed to create organization"
+        );
+    }
+
+    if (!data.organization) {
+        throw new Error(
+            "Organization data was not returned."
+        );
+    }
+
+    return data.organization;
+}
+
 {/* Creating Projects */}
 
 export interface CreateProjectResponse {
@@ -794,6 +846,55 @@ export async function markAllNotificationsRead(
     }
 
     return data.updatedCount ?? 0;
+}
+
+{/* Update Organization */}
+
+export interface UpdateOrganizationInput {
+    name: string;
+    description?: string;
+}
+
+export async function updateOrganization(
+    organizationId: string,
+    token: string,
+    input: UpdateOrganizationInput
+): Promise<OrganizationDetails> {
+    const response = await fetch(
+        `${API_URL}/organizations/${organizationId}`,
+        {
+            method: "PATCH",
+            headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                name: input.name,
+                description: input.description,
+            }),
+            cache: "no-store",
+        }
+    );
+
+    const data =
+        (await response.json()) as OrganizationDetailsResponse & {
+            message?: string;
+        };
+
+    if (!response.ok) {
+        throw new Error(
+            data.message ||
+                "Failed to update organization"
+        );
+    }
+
+    if (!data.organization) {
+        throw new Error(
+            "Organization data was not returned."
+        );
+    }
+
+    return data.organization;
 }
 
 {/* Get Organization */}

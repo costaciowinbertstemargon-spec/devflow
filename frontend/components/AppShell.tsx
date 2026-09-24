@@ -3,18 +3,22 @@
 import {
     Activity,
     Bell,
+    Building2,
     Check,
     ChevronDown,
     FolderKanban,
+    Plus,
     LayoutDashboard,
     ListTodo,
     Menu,
     Settings,
     UserCircle,
     Users,
+    X,
 } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { createOrganization } from "@/lib/api";
 import { useAuth } from "./AuthProvider";
 import { useOrganization } from "./OrganizationProvider";
 import { useNotifications } from "./NotificationProvider";
@@ -23,6 +27,10 @@ const navigation = [
     {
         label: "Overview",
         icon: LayoutDashboard,
+    },
+    {
+        label: "Organization",
+        icon: Building2,
     },
     {
         label: "Projects",
@@ -54,15 +62,23 @@ export default function AppShell({
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const router = useRouter();
     const pathname = usePathname();
+
     const [ organizationMenuOpen, setOrganizationMenuOpen] = useState(false);
-    const { unreadCount } = useNotifications();
-    const { user, logout } = useAuth();
+    const [createOrganizationModalOpen, setCreateOrganizationModalOpen] = useState(false);
+    const [organizationName, setOrganizationName] = useState("");
+    const [organizationDescription, setOrganizationDescription] = useState("");
+    const [creatingOrganization, setCreatingOrganization] = useState(false);
+    const [createOrganizationError, setCreateOrganizationError] = useState("");
     const {
         organizations,
         activeOrganization,
         setActiveOrganization,
+        refreshOrganizations,
         loading: organizationLoading,
     } = useOrganization();
+
+    const { unreadCount } = useNotifications();
+    const { user, logout } = useAuth();
 
     useEffect(() => {
         setSidebarOpen(false);
@@ -86,6 +102,59 @@ export default function AppShell({
             );
         };
     }, []);
+
+    async function handleCreateOrganization(
+        event: React.FormEvent<HTMLFormElement>
+    ) {
+        event.preventDefault();
+
+        const trimmedName = organizationName.trim();
+
+        if (!trimmedName) {
+            setCreateOrganizationError(
+                "Organization name is required."
+            );
+            return;
+        }
+
+        const token = localStorage.getItem("devflow_token");
+
+        if (!token) {
+            setCreateOrganizationError(
+                "Authentication required."
+            );
+            return;
+        }
+
+        setCreatingOrganization(true);
+        setCreateOrganizationError("");
+
+        try {
+            const organization = await createOrganization(
+                token,
+                trimmedName,
+                organizationDescription
+            );
+
+            await refreshOrganizations();
+
+            setActiveOrganization(organization);
+
+            setOrganizationMenuOpen(false);
+            setCreateOrganizationModalOpen(false);
+
+            setOrganizationName("");
+            setOrganizationDescription("");
+        } catch (error) {
+            setCreateOrganizationError(
+                error instanceof Error
+                    ? error.message
+                    : "Failed to create organization."
+            );
+        } finally {
+            setCreatingOrganization(false);
+        }
+    }
 
     return (
         <div className="min-h-screen bg-[var(--background)] text-[var(--text-primary)]">
@@ -125,10 +194,7 @@ export default function AppShell({
                     <div className="relative">
                         <button
                             type="button"
-                            disabled={
-                                organizationLoading ||
-                                organizations.length === 0
-                            }
+                            disabled={organizationLoading}
                             onClick={() =>
                                 setOrganizationMenuOpen(
                                     !organizationMenuOpen
@@ -162,8 +228,7 @@ export default function AppShell({
                         </button>
 
                         {organizationMenuOpen &&
-                            !organizationLoading &&
-                            organizations.length > 0 && (
+                            !organizationLoading && (
                                 <>
                                     <button
                                         type="button"
@@ -179,57 +244,89 @@ export default function AppShell({
                                         aria-label="Select organization"
                                         className="absolute left-0 right-0 top-[calc(100%+8px)] z-50 overflow-hidden rounded-xl border border-[var(--border)] bg-white p-1.5 shadow-lg"
                                     >
-                                        {organizations.map((organization) => {
-                                            const selected =
-                                                organization.id ===
-                                                activeOrganization?.id;
+                                        {organizations.length > 0 ? (
+                                            <>
+                                                {organizations.map((organization) => {
+                                                    const selected =
+                                                        organization.id ===
+                                                        activeOrganization?.id;
 
-                                            return (
-                                                <button
-                                                    key={organization.id}
-                                                    type="button"
-                                                    role="option"
-                                                    aria-selected={selected}
-                                                    onClick={() => {
-                                                        setActiveOrganization(
-                                                            organization
-                                                        );
-                                                        setOrganizationMenuOpen(
-                                                            false
-                                                        );
-                                                    }}
-                                                    className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition ${
-                                                        selected
-                                                            ? "bg-[var(--surface-subtle)]"
-                                                            : "hover:bg-[var(--surface-subtle)]"
-                                                    }`}
-                                                >
-                                                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--primary)]/10 text-xs font-bold text-[var(--primary)]">
-                                                        {organization.name
-                                                            .trim()
-                                                            .charAt(0)
-                                                            .toUpperCase()}
-                                                    </div>
+                                                    return (
+                                                        <button
+                                                            key={organization.id}
+                                                            type="button"
+                                                            role="option"
+                                                            aria-selected={selected}
+                                                            onClick={() => {
+                                                                setActiveOrganization(
+                                                                    organization
+                                                                );
+                                                                setOrganizationMenuOpen(
+                                                                    false
+                                                                );
+                                                            }}
+                                                            className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition ${
+                                                                selected
+                                                                    ? "bg-[var(--surface-subtle)]"
+                                                                    : "hover:bg-[var(--surface-subtle)]"
+                                                            }`}
+                                                        >
+                                                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--primary)]/10 text-xs font-bold text-[var(--primary)]">
+                                                                {organization.name
+                                                                    .trim()
+                                                                    .charAt(0)
+                                                                    .toUpperCase()}
+                                                            </div>
 
-                                                    <div className="min-w-0 flex-1">
-                                                        <p className="truncate text-sm font-medium text-[var(--text-primary)]">
-                                                            {organization.name}
-                                                        </p>
+                                                            <div className="min-w-0 flex-1">
+                                                                <p className="truncate text-sm font-medium text-[var(--text-primary)]">
+                                                                    {organization.name}
+                                                                </p>
 
-                                                        <p className="truncate text-xs text-[var(--text-muted)]">
-                                                            Workspace
-                                                        </p>
-                                                    </div>
+                                                                <p className="truncate text-xs text-[var(--text-muted)]">
+                                                                    Workspace
+                                                                </p>
+                                                            </div>
 
-                                                    {selected && (
-                                                        <Check
-                                                            size={16}
-                                                            className="shrink-0 text-[var(--primary)]"
-                                                        />
-                                                    )}
-                                                </button>
-                                            );
-                                        })}
+                                                            {selected && (
+                                                                <Check
+                                                                    size={16}
+                                                                    className="shrink-0 text-[var(--primary)]"
+                                                                />
+                                                            )}
+                                                        </button>
+                                                    );
+                                                })}
+
+                                                <div className="my-1 border-t border-[var(--border)]" />
+                                            </>
+                                        ) : (
+                                            <div className="px-3 py-3">
+                                                <p className="text-sm font-medium text-[var(--text-primary)]">
+                                                    No organizations yet
+                                                </p>
+
+                                                <p className="mt-1 text-xs text-[var(--text-muted)]">
+                                                    Create one to get started.
+                                                </p>
+                                            </div>
+                                        )}
+
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setOrganizationMenuOpen(false);
+                                                setCreateOrganizationError("");
+                                                setOrganizationName("");
+                                                setOrganizationDescription("");
+                                                setCreateOrganizationModalOpen(true);
+                                            }}
+                                            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium text-[var(--primary)] transition hover:bg-[var(--surface-subtle)]"
+                                        >
+                                            <Plus size={17} />
+
+                                            <span>Create Organization</span>
+                                        </button>
                                     </div>
                                 </>
                             )}
@@ -250,7 +347,9 @@ export default function AppShell({
                                 (item.label === "Overview" &&
                                     pathname === "/dashboard") ||
                                 (item.label === "Projects" &&
-                                    pathname.startsWith("/projects"));
+                                    pathname.startsWith("/projects")) ||
+                                (item.label === "Organization" &&
+                                    pathname.startsWith("/organization"));
 
                             return (
                                 <button
@@ -262,6 +361,10 @@ export default function AppShell({
 
                                         if (item.label === "Overview") {
                                             router.push("/dashboard");
+                                        }
+
+                                        if (item.label === "Organization") {
+                                            router.push("/organization");
                                         }
 
                                         if (item.label === "Projects") {
@@ -411,6 +514,147 @@ export default function AppShell({
                         </button>
                     </div>
                 </header>
+
+                {createOrganizationModalOpen && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4 backdrop-blur-[1px]">
+                        <div
+                            role="dialog"
+                            aria-modal="true"
+                            aria-labelledby="create-organization-title"
+                            className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-xl"
+                        >
+                            <div className="flex items-center justify-between border-b border-[var(--border)] px-5 py-4 sm:px-6">
+                                <div>
+                                    <h2
+                                        id="create-organization-title"
+                                        className="text-lg font-semibold text-[var(--text-primary)]"
+                                    >
+                                        Create Organization
+                                    </h2>
+
+                                    <p className="mt-1 text-sm text-[var(--text-secondary)]">
+                                        Create a workspace for your team.
+                                    </p>
+                                </div>
+
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        if (creatingOrganization) {
+                                            return;
+                                        }
+
+                                        setCreateOrganizationModalOpen(false);
+                                        setCreateOrganizationError("");
+                                    }}
+                                    aria-label="Close create organization modal"
+                                    className="rounded-lg p-2 text-[var(--text-muted)] transition hover:bg-[var(--surface-subtle)] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
+                                >
+                                    <X size={19} />
+                                </button>
+                            </div>
+
+                            <form
+                                onSubmit={handleCreateOrganization}
+                                className="space-y-5 p-5 sm:p-6"
+                            >
+                                {createOrganizationError && (
+                                    <div
+                                        role="alert"
+                                        className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600"
+                                    >
+                                        {createOrganizationError}
+                                    </div>
+                                )}
+
+                                <div>
+                                    <label
+                                        htmlFor="app-shell-organization-name"
+                                        className="mb-2 block text-sm font-medium text-[var(--text-primary)]"
+                                    >
+                                        Organization name
+                                    </label>
+
+                                    <input
+                                        id="app-shell-organization-name"
+                                        type="text"
+                                        value={organizationName}
+                                        onChange={(event) =>
+                                            setOrganizationName(
+                                                event.target.value
+                                            )
+                                        }
+                                        placeholder="e.g. DevFlow Team"
+                                        required
+                                        disabled={creatingOrganization}
+                                        className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2.5 text-sm text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-muted)] focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20 disabled:cursor-not-allowed disabled:opacity-60"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label
+                                        htmlFor="app-shell-organization-description"
+                                        className="mb-2 block text-sm font-medium text-[var(--text-primary)]"
+                                    >
+                                        Description
+                                        <span className="ml-1 font-normal text-[var(--text-muted)]">
+                                            (optional)
+                                        </span>
+                                    </label>
+
+                                    <textarea
+                                        id="app-shell-organization-description"
+                                        value={organizationDescription}
+                                        onChange={(event) =>
+                                            setOrganizationDescription(
+                                                event.target.value
+                                            )
+                                        }
+                                        placeholder="Describe your organization..."
+                                        rows={4}
+                                        disabled={creatingOrganization}
+                                        className="w-full resize-none rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2.5 text-sm text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-muted)] focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20 disabled:cursor-not-allowed disabled:opacity-60"
+                                    />
+                                </div>
+
+                                <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            if (creatingOrganization) {
+                                                return;
+                                            }
+
+                                            setCreateOrganizationModalOpen(
+                                                false
+                                            );
+                                            setCreateOrganizationError("");
+                                        }}
+                                        disabled={creatingOrganization}
+                                        className="inline-flex w-full items-center justify-center rounded-lg border border-[var(--border)] px-4 py-2.5 text-sm font-medium text-[var(--text-secondary)] transition hover:bg-[var(--surface-subtle)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+                                    >
+                                        Cancel
+                                    </button>
+
+                                    <button
+                                        type="submit"
+                                        disabled={
+                                            creatingOrganization ||
+                                            !organizationName.trim()
+                                        }
+                                        className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--primary)] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--primary-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+                                    >
+                                        <Plus size={17} />
+
+                                        {creatingOrganization
+                                            ? "Creating..."
+                                            : "Create Organization"}
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                )}
 
                 {/* Page content */}
                 <main className="min-h-[calc(100vh-4rem)] min-w-0 overflow-x-hidden p-4 sm:p-6 lg:p-8">

@@ -5,6 +5,11 @@ interface CreateOrganizationInput {
     description?: string;
 }
 
+interface UpdateOrganizationInput {
+    name: string;
+    description?: string;
+}
+
 export async function createOrganization(
     input: CreateOrganizationInput,
     userId: string
@@ -48,6 +53,37 @@ export async function getOrganizationById(
     return prisma.organization.findUnique({
         where: {
             id: organizationId,
+        },
+        include: {
+            members: {
+                include: {
+                    user: {
+                        select: {
+                            id: true,
+                            name: true,
+                            email: true,
+                        },
+                    },
+                },
+            },
+        },
+    });
+}
+
+export async function updateOrganization(
+    organizationId: string,
+    input: UpdateOrganizationInput
+) {
+    return prisma.organization.update({
+        where: {
+            id: organizationId,
+        },
+        data: {
+            name: input.name,
+            description:
+                input.description !== undefined
+                    ? input.description || null
+                    : null,
         },
         include: {
             members: {

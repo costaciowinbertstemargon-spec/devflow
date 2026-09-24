@@ -14,6 +14,20 @@ export const createOrganizationSchema = z.object({
         .optional(),
 });
 
+export const updateOrganizationSchema = z.object({
+    name: z
+        .string()
+        .trim()
+        .min(1, "Organization name is required")
+        .max(100, "Organization name is too long"),
+
+    description: z
+        .string()
+        .trim()
+        .max(500, "Organization description is too long")
+        .optional(),
+});
+
 export const addMemberSchema = z.object({
     email: z
         .string()
