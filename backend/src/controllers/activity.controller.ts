@@ -1,6 +1,7 @@
 import type { Response } from "express";
 import type { AuthenticatedRequest } from "../middleware/auth.middleware.js";
 import { prisma } from "../config/database.js";
+import { getOrganizationActivities } from "../services/activity.service.js";
 
 export async function getTaskActivities(
     req: AuthenticatedRequest,
@@ -88,6 +89,63 @@ export async function getTaskActivities(
         return res.status(500).json({
             status: "error",
             message: "Failed to retrieve activity history",
+        });
+    }
+}
+
+export async function getOrganizationActivitiesController(
+    req: AuthenticatedRequest,
+    res: Response    
+) {
+    try {
+        if (!req.user) {
+            return res.status(401).json({
+                status: "error",
+                message: "Authentication required",
+            });
+        }
+
+        const organizationId = req.params.organizationId;
+
+        if (typeof organizationId !== "string") {
+            return res.status(400).json({
+                status: "error",
+                message: "Invalid organization ID",
+            });
+        }
+
+        const membership =
+            await prisma.organizationMember.findUnique({
+                where: {
+                    userId_organizationId: {
+                        userId: req.user.userId,
+                        organizationId,
+                    },
+                },
+            });
+        
+        if (!membership) {
+            return res.status(403).json({
+                status: "error",
+                message: "You are not a member of this organization"
+            });
+        }
+
+        const activities = 
+            await getOrganizationActivities(
+                organizationId
+            );
+        
+        return res.status(200).json({
+            status: "success",
+            activities,
+        });
+    } catch (error) {
+        console.error(error);
+
+        return res.status(500).json({
+            status: "error",
+            message: "Fauled to retrieve organization activity",
         });
     }
 }

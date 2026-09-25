@@ -725,6 +725,66 @@ export async function getTaskActivities(
     return data.activities;
 }
 
+{/* Organization Activities */}
+
+export interface OrganizationActivity {
+    id: string;
+    taskId: string;
+    userId: string;
+    action: string;
+    metadata: Record<string, unknown> | null;
+    createdAt: string;
+    user: {
+        id: string;
+        name: string;
+        email: string;
+    };
+    task: {
+        id: string;
+        title: string;
+        project: {
+            id: string;
+            name: string;
+        };
+    };
+}
+
+export interface OrganizationActivitiesResponse {
+    status: string;
+    activities: OrganizationActivity[];
+}
+
+export async function getOrganizationActivities(
+    organizationId: string,
+    token: string
+): Promise<OrganizationActivity[]> {
+    const response = await fetch(
+        `${API_URL}/organizations/${organizationId}/activities`,
+        {
+            method: "GET",
+            headers: {
+                Authorization: `Bearer ${token}`,
+            },
+            cache: "no-store",
+        }
+    );
+
+    const data =
+        (await response.json()) as
+            OrganizationActivitiesResponse & {
+                message?: string;
+            };
+
+    if (!response.ok) {
+        throw new Error(
+            data.message ||
+                "Failed to load organization activity"
+        );
+    }
+
+    return data.activities;
+}
+
 {/* Add and Get Notification */}
 
 export interface Notification {

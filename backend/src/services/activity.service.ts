@@ -28,3 +28,42 @@ export async function createActivity(
         },
     });
 }
+
+export async function getOrganizationActivities(
+    organizationId: string    
+) {
+    return prisma.activity.findMany({
+        where: {
+            task: {
+                project: {
+                    organizationId,
+                },
+            },
+        },
+        orderBy: {
+            createdAt: "desc",
+        },
+        take: 100,
+        include: {
+            user: {
+                select: {
+                    id: true,
+                    name: true,
+                    email: true,
+                },
+            },
+            task: {
+                select: {
+                    id: true,
+                    title: true,
+                    project: {
+                        select: {
+                            id: true,
+                            name: true,
+                        },
+                    }
+                },
+            },
+        },
+    });
+}

@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { authenticate } from "../middleware/auth.middleware.js";
-import { getTaskActivities } from "../controllers/activity.controller.js";
+import { getTaskActivities, getOrganizationActivitiesController } from "../controllers/activity.controller.js";
 
 const router = Router();
 
@@ -9,5 +9,11 @@ router.get(
     authenticate,
     getTaskActivities
 );
+
+router.get(
+    "/organizations/:organizationId/activities",
+    authenticate,
+    getOrganizationActivitiesController
+)
 
 export default router;
