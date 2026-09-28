@@ -1068,3 +1068,111 @@ export async function addOrganizationMember(
 
     return data.membership;
 }
+
+export interface UpdateOrganizationMemberRoleResponse {
+    status: string;
+    message?: string;
+    membership: OrganizationMember;
+}
+
+export async function updateOrganizationMemberRole(
+    organizationId: string,
+    memberId: string,
+    token: string,
+    role: "ADMIN" | "MEMBER"
+): Promise<OrganizationMember> {
+    const response = await fetch(
+        `${API_URL}/organizations/${organizationId}/members/${memberId}`,
+        {
+            method: "PATCH",
+            headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                role,
+            }),
+            cache: "no-store",
+        }
+    );
+
+    const data =
+        (await response.json()) as
+            UpdateOrganizationMemberRoleResponse & {
+                message?: string;
+            };
+
+    if (!response.ok) {
+        throw new Error(
+            data.message ||
+                "Failed to update member role"
+        );
+    }
+
+    if (!data.membership) {
+        throw new Error(
+            "Membership data was not returned."
+        );
+    }
+
+    return data.membership;
+}
+
+export async function removeOrganizationMember(
+    organizationId: string,
+    memberId: string,
+    token: string
+): Promise<void> {
+    const response = await fetch(
+        `${API_URL}/organizations/${organizationId}/members/${memberId}`,
+        {
+            method: "DELETE",
+            headers: {
+                Authorization: `Bearer ${token}`,
+            },
+            cache: "no-store",
+        }
+    );
+
+    const data =
+        (await response.json()) as {
+            status?: string;
+            message?: string;
+        };
+
+    if (!response.ok) {
+        throw new Error(
+            data.message ||
+                "Failed to remove organization member"
+        );
+    }
+}
+
+export async function leaveOrganization(
+    organizationId: string,
+    token: string
+): Promise<void> {
+    const response = await fetch(
+        `${API_URL}/organizations/${organizationId}/leave`,
+        {
+            method: "POST",
+            headers: {
+                Authorization: `Bearer ${token}`,
+            },
+            cache: "no-store",
+        }
+    );
+
+    const data =
+        (await response.json()) as {
+            status?: string;
+            message?: string;
+        };
+
+    if (!response.ok) {
+        throw new Error(
+            data.message ||
+                "Failed to leave organization"
+        );
+    }
+}

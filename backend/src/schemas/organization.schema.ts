@@ -37,3 +37,8 @@ export const addMemberSchema = z.object({
     role: z
         .enum(["ADMIN", "MEMBER"]),
 });
+
+export const updateOrganizationMemberRoleSchema =
+    z.object({
+        role: z.enum(["ADMIN", "MEMBER"]),
+    });
