@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { createProjectController, getProjects, getProject } from "../controllers/project.controller.js";
+import { createProjectController, getProjects, getProject, updateProjectController } from "../controllers/project.controller.js";
 import { authenticate } from "../middleware/auth.middleware.js";
 import { requireOrganizationRole } from "../middleware/organization.middleware.js";
 import { validateBody } from "../middleware/validate.middware.js";
@@ -26,6 +26,12 @@ router.get(
     "/projects/:projectId",
     authenticate,
     getProject
+);
+
+router.patch(
+    "/projects/:projectId",
+    authenticate,
+    updateProjectController
 );
 
 export default router;

@@ -2,7 +2,7 @@ import type { Response } from "express";
 import { prisma } from "../config/database.js";
 import type { OrganizationRequest } from "../middleware/organization.middleware.js";
 import type { AuthenticatedRequest } from "../middleware/auth.middleware.js";
-import { createProject, getProjectByOrganization, getProjectById } from "../services/project.service.js";
+import { createProject, getProjectByOrganization, getProjectById, updateProject } from "../services/project.service.js";
 
 export async function createProjectController(
     req: OrganizationRequest,
@@ -128,6 +128,54 @@ export async function getProject(
         return res.status(500).json({
             status: "error",
             message: "Failed to retrieve project",
+        });
+    }
+}
+
+export async function updateProjectController(
+    req: AuthenticatedRequest,
+    res: Response
+) {
+    try {
+        if (!req.user) {
+            return res.status(401).json({
+                status: "error",
+                message: "Authentication required",
+            });
+        }
+
+        const projectId = req.params.projectId;
+
+        if (typeof projectId !== "string") {
+            return res.status(400).json({
+                status: "error",
+                message: "Invalid project ID",
+            });
+        }
+
+        const { name, description } = req.body;
+
+        const project = await updateProject(
+            projectId,
+            req.user.userId,
+            {
+                name,
+                description,
+            }
+        );
+
+        return res.status(200).json({
+            status: "success",
+            message: "Project updated successfully",
+            project,
+        });
+    } catch (error) {
+        return res.status(400).json({
+            status: "error",
+            message:
+                error instanceof Error
+                    ? error.message
+                    : "Failed to update project",
         });
     }
 }

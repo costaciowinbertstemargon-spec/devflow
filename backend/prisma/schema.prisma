@@ -53,7 +53,8 @@ model User {
   updatedAt     DateTime @updatedAt
 
   memberships   OrganizationMember[]
-  assifnedTasks Task[]
+  assignedTasks Task[]
+  taskMemberships TaskMember[]
   comments      Comment[]
   activities    Activity[]
   notifications Notification[]
@@ -120,6 +121,20 @@ model Task {
   comments    Comment[]
   activities  Activity[]
   notifications Notification[]
+  taskMembers    TaskMember[]
+}
+
+model TaskMember {
+  id        String   @id @default(uuid())
+  taskId    String
+  userId    String
+  createdAt DateTime @default(now())
+
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, userId])
+  @@index([userId])
 }
 
 model Comment {

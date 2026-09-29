@@ -10,9 +10,13 @@ import {
     getTaskActivities,
     getTaskComments,
     updateTask,
+    getTaskMembers,
+    addTaskMember,
+    removeTaskMember,
     type Task,
     type TaskActivity,
     type TaskComment,
+    type TaskMember,
 } from "@/lib/api";
 import { getToken } from "@/lib/auth";
 import {
@@ -89,6 +93,24 @@ export default function TaskDetailsPage() {
 
     const { user } = useAuth();
     const [canEditTask, setCanEditTask] = useState(false);
+    const [organizationMembers, setOrganizationMembers] =
+        useState<
+            {
+                id: string;
+                userId: string;
+                role: string;
+                user: {
+                    id: string;
+                    name: string;
+                    email: string;
+                };
+            }[]
+        >([]);
+
+    const [taskMembers, setTaskMembers] = useState<TaskMember[]>([]);
+    const [addingTaskMember, setAddingTaskMember] = useState(false);
+    const [selectedTaskMember, setSelectedTaskMember] = useState("");
+    const [taskMemberError, setTaskMemberError] = useState("");   
 
     const [task, setTask] = useState<Task | null>(null);
     const [loading, setLoading] = useState(true);
@@ -100,6 +122,7 @@ export default function TaskDetailsPage() {
     const [taskPriority, setTaskPriority] = useState("MEDIUM");
     const [taskStatus, setTaskStatus] = useState("TODO");
     const [taskDueDate, setTaskDueDate] = useState("");
+    const [taskAssigneeId, setTaskAssigneeId] = useState("");
     const [savingTask, setSavingTask] = useState(false);
     const [taskFormError, setTaskFormError] = useState("");
 
@@ -144,24 +167,28 @@ export default function TaskDetailsPage() {
                     taskResult,
                     commentsResult,
                     activitiesResult,
+                    taskMembersResult,
                 ] = await Promise.all([
                     getTask(taskId, token),
                     getTaskComments(taskId, token),
-                    getTaskActivities(
-                        taskId,
-                        token
-                    ),
+                    getTaskActivities(taskId, token),
+                    getTaskMembers(taskId, token),
                 ]);
 
                 setTask(taskResult);
                 setComments(commentsResult);
                 setActivities(activitiesResult);
+                setTaskMembers(taskMembersResult);
 
                 const organization =
                     await getOrganization(
                         taskResult.project?.organizationId ?? "",
                         token
                     );
+
+                setOrganizationMembers(
+                    organization.members
+                );
 
                 const membership =
                     organization.members.find(
@@ -234,6 +261,9 @@ export default function TaskDetailsPage() {
                                 `${taskDueDate}T00:00:00`
                             ).toISOString()
                             : null,
+                        assigneeId: taskAssigneeId
+                            ? taskAssigneeId
+                            : null,
                     }
                 );
 
@@ -265,6 +295,11 @@ export default function TaskDetailsPage() {
         setTaskDescription(
             task.description ?? ""
         );
+
+        setTaskAssigneeId(
+            task.assigneeId ?? ""
+        );
+
         setTaskStatus(task.status);
         setTaskPriority(task.priority);
 
@@ -327,6 +362,73 @@ export default function TaskDetailsPage() {
             );
         } finally {
             setSubmittingComment(false);
+        }
+    }
+
+    async function handleAddTaskMember() {
+        const token = getToken();
+
+        if (!selectedTaskMember || !token) {
+            return;
+        }
+
+        setAddingTaskMember(true);
+        setTaskMemberError("");
+
+        try {
+            const member = await addTaskMember(
+                taskId,
+                selectedTaskMember,
+                token
+            );
+
+            setTaskMembers((current) => [
+                ...current,
+                member,
+            ]);
+
+            setSelectedTaskMember("");
+        } catch (error) {
+            setTaskMemberError(
+                error instanceof Error
+                    ? error.message
+                    : "Failed to add task member"
+            );
+        } finally {
+            setAddingTaskMember(false);
+        }
+    }
+
+    async function handleRemoveTaskMember(
+        userId: string
+    ) {
+        const token = getToken();
+
+        if (!token) {
+            return;
+        }
+
+        setTaskMemberError("");
+
+        try {
+            await removeTaskMember(
+                taskId,
+                userId,
+                token
+            );
+
+            setTaskMembers((current) =>
+                current.filter(
+                    (member) =>
+                        member.userId !== userId
+                )
+            );
+        } catch (error) {
+            setTaskMemberError(
+                error instanceof Error
+                    ? error.message
+                    : "Failed to remove task member"
+            );
         }
     }
 
@@ -483,7 +585,7 @@ export default function TaskDetailsPage() {
                                             </p>
 
                                             <p className="mt-2 text-sm font-medium">
-                                                {task.assigneeId ||
+                                                {task.assignee?.name ||
                                                     "Unassigned"}
                                             </p>
                                         </div>
@@ -498,6 +600,126 @@ export default function TaskDetailsPage() {
                                             {task.id}
                                         </p>
                                     </div>
+
+                                </div>
+                                <div className="border-t border-slate-200 pt-5">
+                                    <div className="mb-3 flex items-center justify-between">
+                                        <div>
+                                            <h3 className="text-sm font-semibold text-slate-900">
+                                                Collaborators
+                                            </h3>
+                                            <p className="mt-1 text-xs text-slate-500">
+                                                People working on this task
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        {taskMembers.length === 0 ? (
+                                            <p className="text-sm text-slate-500">
+                                                No additional collaborators.
+                                            </p>
+                                        ) : (
+                                            taskMembers.map((member) => (
+                                                <div
+                                                    key={member.id}
+                                                    className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2.5"
+                                                >
+                                                    <div className="flex min-w-0 items-center gap-3">
+                                                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-600">
+                                                            {member.user.name
+                                                                .slice(0, 2)
+                                                                .toUpperCase()}
+                                                        </div>
+
+                                                        <div className="min-w-0">
+                                                            <p className="truncate text-sm font-medium text-slate-900">
+                                                                {member.user.name}
+                                                            </p>
+
+                                                            <p className="truncate text-xs text-slate-500">
+                                                                {member.user.email}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+
+                                                    {canEditTask && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() =>
+                                                                handleRemoveTaskMember(
+                                                                    member.userId
+                                                                )
+                                                            }
+                                                            className="ml-3 shrink-0 rounded-md px-2 py-1 text-xs font-medium text-slate-500 transition hover:bg-red-50 hover:text-red-600"
+                                                        >
+                                                            Remove
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            ))
+                                        )}
+                                    </div>
+
+                                    {canEditTask && (
+                                        <div className="mt-4">
+                                            <div className="flex gap-2">
+                                                <select
+                                                    value={selectedTaskMember}
+                                                    onChange={(event) =>
+                                                        setSelectedTaskMember(
+                                                            event.target.value
+                                                        )
+                                                    }
+                                                    className="min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
+                                                >
+                                                    <option value="">
+                                                        Add a collaborator
+                                                    </option>
+
+                                                    {organizationMembers
+                                                        .filter(
+                                                            (member) =>
+                                                                member.userId !==
+                                                                    task?.assigneeId &&
+                                                                !taskMembers.some(
+                                                                    (taskMember) =>
+                                                                        taskMember.userId ===
+                                                                        member.userId
+                                                                )
+                                                        )
+                                                        .map((member) => (
+                                                            <option
+                                                                key={member.userId}
+                                                                value={member.userId}
+                                                            >
+                                                                {member.user.name}
+                                                            </option>
+                                                        ))}
+                                                </select>
+
+                                                <button
+                                                    type="button"
+                                                    disabled={
+                                                        !selectedTaskMember ||
+                                                        addingTaskMember
+                                                    }
+                                                    onClick={handleAddTaskMember}
+                                                    className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                                                >
+                                                    {addingTaskMember
+                                                        ? "Adding..."
+                                                        : "Add"}
+                                                </button>
+                                            </div>
+
+                                            {taskMemberError && (
+                                                <p className="mt-2 text-xs text-red-600">
+                                                    {taskMemberError}
+                                                </p>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         )}
@@ -894,6 +1116,41 @@ export default function TaskDetailsPage() {
                                                 <option value="URGENT">
                                                     Urgent
                                                 </option>
+                                            </select>
+                                        </div>
+
+                                        <div>
+                                            <label
+                                                htmlFor="task-assignee"
+                                                className="mb-2 block text-sm font-semibold"
+                                            >
+                                                Assignee
+                                            </label>
+
+                                            <select
+                                                id="task-assignee"
+                                                value={taskAssigneeId}
+                                                onChange={(event) =>
+                                                    setTaskAssigneeId(
+                                                        event.target.value
+                                                    )
+                                                }
+                                                className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-sm outline-none transition focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20"
+                                            >
+                                                <option value="">
+                                                    Unassigned
+                                                </option>
+
+                                                {organizationMembers.map(
+                                                    (member) => (
+                                                        <option
+                                                            key={member.userId}
+                                                            value={member.userId}
+                                                        >
+                                                            {member.user.name}
+                                                        </option>
+                                                    )
+                                                )}
                                             </select>
                                         </div>
 

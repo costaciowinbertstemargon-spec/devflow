@@ -85,6 +85,50 @@ export async function getProject(
     return data.project;
 }
 
+export async function updateProject(
+    projectId: string,
+    token: string,
+    name: string,
+    description?: string
+): Promise<Project> {
+    const response = await fetch(
+        `${API_URL}/projects/${projectId}`,
+        {
+            method: "PATCH",
+            headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                name,
+                description,
+            }),
+            cache: "no-store",
+        }
+    );
+
+    const data = (await response.json()) as {
+        status?: string;
+        message?: string;
+        project?: Project;
+    };
+
+    if (!response.ok) {
+        throw new Error(
+            data.message ||
+                "Failed to update project"
+        );
+    }
+
+    if (!data.project) {
+        throw new Error(
+            "Project data was not returned."
+        );
+    }
+
+    return data.project;
+}
+
 {/* Login and Update Profile */}
 
 export interface User {
@@ -512,6 +556,7 @@ export async function updateTask(
         status?: string;
         priority?: string;
         dueDate?: string | null;
+        assigneeId?: string | null;
     }
 ): Promise<Task> {
     const response = await fetch(
@@ -578,6 +623,97 @@ export async function getTask(
     }
 
     return data.task;
+}
+
+export interface TaskMember {
+    id: string;
+    taskId: string;
+    userId: string;
+    createdAt: string;
+    user: {
+        id: string;
+        name: string;
+        email: string;
+    };
+}
+
+export async function getTaskMembers(
+    taskId: string,
+    token: string
+): Promise<TaskMember[]> {
+    const response = await fetch(
+        `${API_URL}/tasks/${taskId}/members`,
+        {
+            headers: {
+                Authorization: `Bearer ${token}`,
+            },
+        }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+        throw new Error(
+            data.message || "Failed to load task members"
+        );
+    }
+
+    return data.members;
+}
+
+export async function addTaskMember(
+    taskId: string,
+    userId: string,
+    token: string
+): Promise<TaskMember> {
+    const response = await fetch(
+        `${API_URL}/tasks/${taskId}/members`,
+        {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+                userId,
+            }),
+        }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+        throw new Error(
+            data.message || "Failed to add task member"
+        );
+    }
+
+    return data.member;
+}
+
+export async function removeTaskMember(
+    taskId: string,
+    userId: string,
+    token: string
+): Promise<void> {
+    const response = await fetch(
+        `${API_URL}/tasks/${taskId}/members/${userId}`,
+        {
+            method: "DELETE",
+            headers: {
+                Authorization: `Bearer ${token}`,
+            },
+        }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+        throw new Error(
+            data.message ||
+                "Failed to remove task member"
+        );
+    }
 }
 
 {/* Add and Get Comment */}

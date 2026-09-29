@@ -7,9 +7,12 @@ import {
     createTask,
     getProject,
     getTasks,
-    getOrganization, 
+    getOrganization,
+    getTaskActivities,
+    updateProject, 
     type Project,
     type Task,
+    type TaskActivity,
 } from "@/lib/api";
 import { getToken } from "@/lib/auth";
 import {
@@ -40,6 +43,35 @@ function getStatusIcon(status: string) {
     return <Circle size={17} />;
 }
 
+function getActivityMessage(
+    activity: TaskActivity
+) {
+    switch (activity.action) {
+        case "COMMENT_ADDED":
+            return "added a comment";
+
+        case "TASK_CREATED":
+            return "created this task";
+
+        case "TASK_UPDATED":
+            return "updated this task";
+
+        case "TASK_ASSIGNED":
+            return "assigned this task";
+
+        case "STATUS_CHANGED":
+            return "changed the task status";
+
+        case "PRIORITY_CHANGED":
+            return "changed the task priority";
+
+        default:
+            return activity.action
+                .toLowerCase()
+                .replace(/_/g, " ");
+    }
+}
+
 export default function ProjectDetailsPage() {
     const params = useParams();
     const projectId = params.projectId as string;
@@ -56,6 +88,16 @@ export default function ProjectDetailsPage() {
     const [tasksLoading, setTasksLoading] = useState(true);
     const [tasksError, setTasksError] = useState("");
 
+    const [activities, setActivities] = useState<TaskActivity[]>([]);
+    const [activitiesLoading, setActivitiesLoading] = useState(true);
+    const [activitiesError, setActivitiesError] = useState("");
+
+    const [editProjectModalOpen, setEditProjectModalOpen] = useState(false);
+    const [projectName, setProjectName] = useState("");
+    const [projectDescription, setProjectDescription] = useState("");
+    const [savingProject, setSavingProject] = useState(false);
+    const [projectFormError, setProjectFormError] = useState("");
+
     const [createTaskModalOpen, setCreateTaskModalOpen] = useState(false);
     const [taskTitle, setTaskTitle] = useState("");
     const [taskDescription, setTaskDescription] = useState("");
@@ -63,6 +105,11 @@ export default function ProjectDetailsPage() {
     const [taskDueDate, setTaskDueDate] = useState("");
     const [savingTask, setSavingTask] = useState(false);
     const [taskFormError, setTaskFormError] = useState("");
+
+    const [activeView, setActiveView] =
+        useState<"tasks" | "board" | "activity">(
+            "tasks"
+        );
 
     const [search, setSearch] = useState("");
     const [filtersOpen, setFiltersOpen] = useState(false);
@@ -119,6 +166,23 @@ export default function ProjectDetailsPage() {
                 setProject(projectResult);
                 setTasks(tasksResult);
 
+                setActivitiesLoading(true);
+                setActivitiesError("");
+
+                const taskActivities =
+                    await Promise.all(
+                        tasksResult.map((task) =>
+                            getTaskActivities(
+                                task.id,
+                                token
+                            )
+                        )
+                    );
+
+                setActivities(
+                    taskActivities.flat()
+                );
+
                 const organization = await getOrganization(
                     projectResult.organizationId,
                     token
@@ -140,10 +204,12 @@ export default function ProjectDetailsPage() {
                 
                 setError(message);
                 setTasksError(message);
+                setActivitiesError(message);
 
             } finally {
                 setLoading(false);
                 setTasksLoading(false);
+                setActivitiesLoading(false);
             }
         }
 
@@ -210,6 +276,56 @@ export default function ProjectDetailsPage() {
             );
         } finally {
             setSavingTask(false);
+        }
+    }
+
+    async function handleUpdateProject(
+        event: React.FormEvent<HTMLFormElement>
+    ) {
+        event.preventDefault();
+
+        const token = getToken();
+
+        if (!token) {
+            setProjectFormError(
+                "Authentication required."
+            );
+            return;
+        }
+
+        if (!project) {
+            return;
+        }
+
+        if (!projectName.trim()) {
+            setProjectFormError(
+                "Project name is required."
+            );
+            return;
+        }
+
+        setSavingProject(true);
+        setProjectFormError("");
+
+        try {
+            const updatedProject =
+                await updateProject(
+                    project.id,
+                    token,
+                    projectName,
+                    projectDescription
+                );
+
+            setProject(updatedProject);
+            setEditProjectModalOpen(false);
+        } catch (error) {
+            setProjectFormError(
+                error instanceof Error
+                    ? error.message
+                    : "Failed to update project."
+            );
+        } finally {
+            setSavingProject(false);
         }
     }
 
@@ -414,18 +530,31 @@ export default function ProjectDetailsPage() {
                                     </div>
 
                                     <div className="flex items-center gap-2">
-                                        <button
-                                            type="button"
+                                        <Link
+                                            href={"/members"}
                                             className="inline-flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2.5 text-sm font-medium text-[var(--text-secondary)] transition hover:bg-[var(--surface-subtle)] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2"
                                         >
                                             <Users size={16} />
                                             Members
-                                        </button>
+                                        </Link>
 
                                         <button
                                             type="button"
+                                            onClick={() => {
+                                                if (!project) {
+                                                    return;
+                                                }
+
+                                                setProjectName(project.name);
+                                                setProjectDescription(
+                                                    project.description ?? ""
+                                                );
+                                                setProjectFormError("");
+                                                setEditProjectModalOpen(true);
+                                            }}
                                             className="rounded-lg p-2.5 text-[var(--text-secondary)] transition hover:bg-[var(--surface-subtle)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2"
-                                            aria-label="Project options"
+                                            aria-label="Edit project"
+                                            title="Edit project"
                                         >
                                             <MoreHorizontal size={19} />
                                         </button>
@@ -481,21 +610,42 @@ export default function ProjectDetailsPage() {
                                 <div className="flex w-full items-center gap-2 sm:w-auto">
                                     <button
                                         type="button"
-                                        className="rounded-lg bg-[var(--primary)] px-3.5 py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--primary-hover)]"
+                                        onClick={() =>
+                                            setActiveView("tasks")
+                                        }
+                                        className={
+                                            activeView === "tasks"
+                                                ? "rounded-lg bg-[var(--primary)] px-3.5 py-2.5 text-sm font-semibold text-white"
+                                                : "rounded-lg px-3.5 py-2.5 text-sm font-medium text-[var(--text-secondary)] transition hover:bg-[var(--surface-subtle)]"
+                                        }
                                     >
                                         Tasks
                                     </button>
 
                                     <button
                                         type="button"
-                                        className="rounded-lg px-3.5 py-2.5 text-sm font-medium text-[var(--text-secondary)] transition hover:bg-[var(--surface-subtle)]"
+                                        onClick={() =>
+                                            setActiveView("board")
+                                        }
+                                        className={
+                                            activeView === "board"
+                                                ? "rounded-lg bg-[var(--primary)] px-3.5 py-2.5 text-sm font-semibold text-white"
+                                                : "rounded-lg px-3.5 py-2.5 text-sm font-medium text-[var(--text-secondary)] transition hover:bg-[var(--surface-subtle)]"
+                                        }
                                     >
                                         Board
                                     </button>
 
                                     <button
                                         type="button"
-                                        className="rounded-lg px-3.5 py-2.5 text-sm font-medium text-[var(--text-secondary)] transition hover:bg-[var(--surface-subtle)]"
+                                        onClick={() =>
+                                            setActiveView("activity")
+                                        }
+                                        className={
+                                            activeView === "activity"
+                                                ? "rounded-lg bg-[var(--primary)] px-3.5 py-2.5 text-sm font-semibold text-white"
+                                                : "rounded-lg px-3.5 py-2.5 text-sm font-medium text-[var(--text-secondary)] transition hover:bg-[var(--surface-subtle)]"
+                                        }
                                     >
                                         Activity
                                     </button>
@@ -520,362 +670,695 @@ export default function ProjectDetailsPage() {
                                 )}
                             </div>
 
-                            {/* Search and filter */}
-                            <div className="mt-4 flex flex-col gap-3 sm:flex-row">
-                                <div className="relative flex-1">
-                                    <Search
-                                        size={18}
-                                        className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]"
-                                    />
+                            {activeView === "tasks" && (
+                                <>
+                                    {/* Search and filter */}
+                                    <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+                                        <div className="relative flex-1">
+                                            <Search
+                                                size={18}
+                                                className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]"
+                                            />
 
-                                    <input
-                                        type="search"
-                                        value={search}
-                                        onChange={(event) => 
-                                            setSearch(event.target.value)
-                                        }
-                                        placeholder="Search tasks..."
-                                        className="h-11 w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] pl-10 pr-4 text-sm outline-none transition placeholder:text-[var(--text-muted)] focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--accent)]/20 focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
-                                    />
-                                </div>
-
-                                <button
-                                    type="button"
-                                    onClick={() => 
-                                        setFiltersOpen(
-                                            (current) => !current
-                                        )
-                                    }
-                                    className={`inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg border px-4 text-sm font-medium transition sm:w-auto ${
-                                        filtersOpen ||
-                                        statusFilter !== "ALL" ||
-                                        priorityFilter !== "ALL"
-                                            ? "border-[var(--primary)] bg-[var(--primary)]/5 text-[var(--primary)]"
-                                            : "border-[var(--border)] bg-[var(--surface)] text-[var(--text-secondary)] hover:bg-[var(--surface-subtle)]"
-                                    }focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2`}                             
-                                >
-                                    <Filter size={16} />
-                                    Filters
-                                </button>
-                            </div>
-
-                            {filtersOpen && (
-                                <div className="mt-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-sm">
-                                    <div className="grid gap-4 md:grid-cols-3">
-                                        <div>
-                                            <label
-                                                htmlFor="task-status-filter"
-                                                className="mb-2 block text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]"
-                                            >
-                                                Status
-                                            </label>
-
-                                            <select
-                                                id="task-status-filter"
-                                                value={statusFilter}
-                                                onChange={(event) =>
-                                                    setStatusFilter(
-                                                        event.target.value as typeof statusFilter
-                                                    )
+                                            <input
+                                                type="search"
+                                                value={search}
+                                                onChange={(event) => 
+                                                    setSearch(event.target.value)
                                                 }
-                                                className="h-10 w-full rounded-lg border border-[var(--border)] bg-white px-3 text-sm outline-none focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--accent)]/20"
-                                            >
-                                                <option value="ALL">
-                                                    All statuses
-                                                </option>
-
-                                                <option value="TODO">
-                                                    To Do
-                                                </option>
-
-                                                <option value="IN_PROGRESS">
-                                                    In Progress
-                                                </option>
-
-                                                <option value="REVIEW">
-                                                    Review
-                                                </option>
-
-                                                <option value="DONE">
-                                                    Done
-                                                </option>
-                                            </select>
+                                                placeholder="Search tasks..."
+                                                className="h-11 w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] pl-10 pr-4 text-sm outline-none transition placeholder:text-[var(--text-muted)] focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--accent)]/20 focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
+                                            />
                                         </div>
 
-                                        <div>
-                                            <label
-                                                htmlFor="task-priority-filter"
-                                                className="mb-2 block text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]"
-                                            >
-                                                Priority
-                                            </label>
-
-                                            <select
-                                                id="task-priority-filter"
-                                                value={priorityFilter}
-                                                onChange={(event) =>
-                                                    setPriorityFilter(
-                                                        event.target.value as typeof priorityFilter
-                                                    )
-                                                }
-                                                className="h-10 w-full rounded-lg border border-[var(--border)] bg-white px-3 text-sm outline-none focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--accent)]/20"
-                                            >
-                                                <option value="ALL">
-                                                    All priorities
-                                                </option>
-
-                                                <option value="LOW">
-                                                    Low
-                                                </option>
-
-                                                <option value="MEDIUM">
-                                                    Medium
-                                                </option>
-
-                                                <option value="HIGH">
-                                                    High
-                                                </option>
-
-                                                <option value="URGENT">
-                                                    Urgent
-                                                </option>
-                                            </select>
-                                        </div>
-
-                                        <div>
-                                            <label
-                                                htmlFor="task-sort"
-                                                className="mb-2 block text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]"
-                                            >
-                                                Sort
-                                            </label>
-
-                                            <select
-                                                id="task-sort"
-                                                value={sortBy}
-                                                onChange={(event) =>
-                                                    setSortBy(
-                                                        event.target.value as typeof sortBy
-                                                    )
-                                                }
-                                                className="h-10 w-full rounded-lg border border-[var(--border)] bg-white px-3 text-sm outline-none focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--accent)]/20"
-                                            >
-                                                <option value="updated-desc">
-                                                    Recently updated
-                                                </option>
-
-                                                <option value="created-desc">
-                                                    Newest created
-                                                </option>
-
-                                                <option value="due-asc">
-                                                    Due date
-                                                </option>
-
-                                                <option value="name-asc">
-                                                    Task name A–Z
-                                                </option>
-                                            </select>
-                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => 
+                                                setFiltersOpen(
+                                                    (current) => !current
+                                                )
+                                            }
+                                            className={`inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg border px-4 text-sm font-medium transition sm:w-auto ${
+                                                filtersOpen ||
+                                                statusFilter !== "ALL" ||
+                                                priorityFilter !== "ALL"
+                                                    ? "border-[var(--primary)] bg-[var(--primary)]/5 text-[var(--primary)]"
+                                                    : "border-[var(--border)] bg-[var(--surface)] text-[var(--text-secondary)] hover:bg-[var(--surface-subtle)]"
+                                            }focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2`}                             
+                                        >
+                                            <Filter size={16} />
+                                            Filters
+                                        </button>
                                     </div>
 
-                                    {(search ||
-                                        statusFilter !== "ALL" ||
-                                        priorityFilter !== "ALL") && (
-                                        <div className="mt-4 flex justify-end border-t border-[var(--border)] pt-4">
+                                    {filtersOpen && (
+                                        <div className="mt-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-sm">
+                                            <div className="grid gap-4 md:grid-cols-3">
+                                                <div>
+                                                    <label
+                                                        htmlFor="task-status-filter"
+                                                        className="mb-2 block text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]"
+                                                    >
+                                                        Status
+                                                    </label>
+
+                                                    <select
+                                                        id="task-status-filter"
+                                                        value={statusFilter}
+                                                        onChange={(event) =>
+                                                            setStatusFilter(
+                                                                event.target.value as typeof statusFilter
+                                                            )
+                                                        }
+                                                        className="h-10 w-full rounded-lg border border-[var(--border)] bg-white px-3 text-sm outline-none focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--accent)]/20"
+                                                    >
+                                                        <option value="ALL">
+                                                            All statuses
+                                                        </option>
+
+                                                        <option value="TODO">
+                                                            To Do
+                                                        </option>
+
+                                                        <option value="IN_PROGRESS">
+                                                            In Progress
+                                                        </option>
+
+                                                        <option value="REVIEW">
+                                                            Review
+                                                        </option>
+
+                                                        <option value="DONE">
+                                                            Done
+                                                        </option>
+                                                    </select>
+                                                </div>
+
+                                                <div>
+                                                    <label
+                                                        htmlFor="task-priority-filter"
+                                                        className="mb-2 block text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]"
+                                                    >
+                                                        Priority
+                                                    </label>
+
+                                                    <select
+                                                        id="task-priority-filter"
+                                                        value={priorityFilter}
+                                                        onChange={(event) =>
+                                                            setPriorityFilter(
+                                                                event.target.value as typeof priorityFilter
+                                                            )
+                                                        }
+                                                        className="h-10 w-full rounded-lg border border-[var(--border)] bg-white px-3 text-sm outline-none focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--accent)]/20"
+                                                    >
+                                                        <option value="ALL">
+                                                            All priorities
+                                                        </option>
+
+                                                        <option value="LOW">
+                                                            Low
+                                                        </option>
+
+                                                        <option value="MEDIUM">
+                                                            Medium
+                                                        </option>
+
+                                                        <option value="HIGH">
+                                                            High
+                                                        </option>
+
+                                                        <option value="URGENT">
+                                                            Urgent
+                                                        </option>
+                                                    </select>
+                                                </div>
+
+                                                <div>
+                                                    <label
+                                                        htmlFor="task-sort"
+                                                        className="mb-2 block text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]"
+                                                    >
+                                                        Sort
+                                                    </label>
+
+                                                    <select
+                                                        id="task-sort"
+                                                        value={sortBy}
+                                                        onChange={(event) =>
+                                                            setSortBy(
+                                                                event.target.value as typeof sortBy
+                                                            )
+                                                        }
+                                                        className="h-10 w-full rounded-lg border border-[var(--border)] bg-white px-3 text-sm outline-none focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--accent)]/20"
+                                                    >
+                                                        <option value="updated-desc">
+                                                            Recently updated
+                                                        </option>
+
+                                                        <option value="created-desc">
+                                                            Newest created
+                                                        </option>
+
+                                                        <option value="due-asc">
+                                                            Due date
+                                                        </option>
+
+                                                        <option value="name-asc">
+                                                            Task name A–Z
+                                                        </option>
+                                                    </select>
+                                                </div>
+                                            </div>
+
+                                            {(search ||
+                                                statusFilter !== "ALL" ||
+                                                priorityFilter !== "ALL") && (
+                                                <div className="mt-4 flex justify-end border-t border-[var(--border)] pt-4">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setSearch("");
+                                                            setStatusFilter("ALL");
+                                                            setPriorityFilter("ALL");
+                                                        }}
+                                                        className="text-sm font-medium text-[var(--primary)] hover:underline"
+                                                    >
+                                                        Clear filters
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {/* Task table */}
+                                    {tasksLoading && (
+                                        <div className="mt-4 overflow-x-auto rounded-xl border border-[var(--border)] bg-[var(--surface)]">
+                                            <div className="divide-y divide-[var(--border)]">
+                                                {[1, 2, 3].map((item) => (
+                                                    <div
+                                                        key={item}
+                                                        className="grid gap-4 px-5 py-5 md:grid-cols-[minmax(0,2fr)_150px_110px_100px_40px]"
+                                                    >
+                                                        <div>
+                                                            <div className="h-4 w-48 animate-pulse rounded bg-[var(--surface-subtle)]" />
+                                                            <div className="mt-2 h-3 w-32 animate-pulse rounded bg-[var(--surface-subtle)]" />
+                                                        </div>
+
+                                                        <div className="h-4 w-24 animate-pulse rounded bg-[var(--surface-subtle)]" />
+                                                        <div className="h-6 w-16 animate-pulse rounded bg-[var(--surface-subtle)]" />
+                                                        <div className="h-8 w-8 animate-pulse rounded-full bg-[var(--surface-subtle)]" />
+                                                        <div />
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {!tasksLoading && tasksError && (
+                                        <div
+                                            role="alert"
+                                            className="mt-4 rounded-xl border border-red-200 bg-red-50 p-5 text-sm text-red-700"
+                                        >
+                                            <p>{tasksError}</p>
+
                                             <button
                                                 type="button"
-                                                onClick={() => {
-                                                    setSearch("");
-                                                    setStatusFilter("ALL");
-                                                    setPriorityFilter("ALL");
-                                                }}
-                                                className="text-sm font-medium text-[var(--primary)] hover:underline"
+                                                onClick={() => window.location.reload()}
+                                                className="mt-3 inline-flex items-center rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-sm font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--surface-subtle)]"
                                             >
-                                                Clear filters
+                                                Try Again
                                             </button>
                                         </div>
                                     )}
-                                </div>
-                            )}
 
-                            {/* Task table */}
-                            {tasksLoading && (
-                                <div className="mt-4 overflow-x-auto rounded-xl border border-[var(--border)] bg-[var(--surface)]">
-                                    <div className="divide-y divide-[var(--border)]">
-                                        {[1, 2, 3].map((item) => (
-                                            <div
-                                                key={item}
-                                                className="grid gap-4 px-5 py-5 md:grid-cols-[minmax(0,2fr)_150px_110px_100px_40px]"
-                                            >
-                                                <div>
-                                                    <div className="h-4 w-48 animate-pulse rounded bg-[var(--surface-subtle)]" />
-                                                    <div className="mt-2 h-3 w-32 animate-pulse rounded bg-[var(--surface-subtle)]" />
-                                                </div>
+                                    {!tasksLoading && !tasksError && filteredTasks.length === 0 && (
+                                        <div className="mt-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-10 text-center">
+                                            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-[var(--surface-subtle)] text-[var(--text-muted)]">
+                                                <CheckCircle2 size={24} />
+                                            </div>
 
-                                                <div className="h-4 w-24 animate-pulse rounded bg-[var(--surface-subtle)]" />
-                                                <div className="h-6 w-16 animate-pulse rounded bg-[var(--surface-subtle)]" />
-                                                <div className="h-8 w-8 animate-pulse rounded-full bg-[var(--surface-subtle)]" />
+                                            <h2 className="text-base font-semibold">
+                                                {tasks.length === 0
+                                                    ? "No tasks yet"
+                                                    : "No matching tasks"}
+                                            </h2>
+
+                                            <p className="mx-auto mt-1 max-w-md text-sm leading-6 text-[var(--text-secondary)]">
+                                                {tasks.length === 0
+                                                    ? "Add your first task to start organizing and tracking work in this project."
+                                                    : "No tasks match your current search and filters. Try changing your criteria."}
+                                            </p>
+
+                                            {tasks.length === 0 ? (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setTaskFormError("");
+                                                        setTaskTitle("");
+                                                        setTaskDescription("");
+                                                        setTaskPriority("MEDIUM");
+                                                        setTaskDueDate("");
+                                                        setCreateTaskModalOpen(true);
+                                                    }}
+                                                    className="mt-5 inline-flex items-center justify-center rounded-lg bg-[var(--primary)] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--primary-hover)]"
+                                                >
+                                                    Add your first task
+                                                </button>
+                                            ) : (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setSearch("");
+                                                        setStatusFilter("ALL");
+                                                        setPriorityFilter("ALL");
+                                                    }}
+                                                    className="mt-5 inline-flex items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-sm font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--surface-subtle)]"
+                                                >
+                                                    Clear search and filters
+                                                </button>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {!tasksLoading && !tasksError && filteredTasks.length > 0 && (
+                                        <div className="mt-4 overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)]">
+                                            <div className="hidden border-b border-[var(--border)] px-5 py-3 text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)] md:grid md:grid-cols-[minmax(0,2fr)_150px_110px_100px_40px] md:gap-4">
+                                                <div>Task</div>
+                                                <div>Status</div>
+                                                <div>Priority</div>
+                                                <div>Assignee</div>
                                                 <div />
                                             </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
 
-                            {!tasksLoading && tasksError && (
-                                <div
-                                    role="alert"
-                                    className="mt-4 rounded-xl border border-red-200 bg-red-50 p-5 text-sm text-red-700"
-                                >
-                                    <p>{tasksError}</p>
-
-                                    <button
-                                        type="button"
-                                        onClick={() => window.location.reload()}
-                                        className="mt-3 inline-flex items-center rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-sm font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--surface-subtle)]"
-                                    >
-                                        Try Again
-                                    </button>
-                                </div>
-                            )}
-
-                            {!tasksLoading && !tasksError && filteredTasks.length === 0 && (
-                                <div className="mt-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-10 text-center">
-                                    <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-[var(--surface-subtle)] text-[var(--text-muted)]">
-                                        <CheckCircle2 size={24} />
-                                    </div>
-
-                                    <h2 className="text-base font-semibold">
-                                        {tasks.length === 0
-                                            ? "No tasks yet"
-                                            : "No matching tasks"}
-                                    </h2>
-
-                                    <p className="mx-auto mt-1 max-w-md text-sm leading-6 text-[var(--text-secondary)]">
-                                        {tasks.length === 0
-                                            ? "Add your first task to start organizing and tracking work in this project."
-                                            : "No tasks match your current search and filters. Try changing your criteria."}
-                                    </p>
-
-                                    {tasks.length === 0 ? (
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                setTaskFormError("");
-                                                setTaskTitle("");
-                                                setTaskDescription("");
-                                                setTaskPriority("MEDIUM");
-                                                setTaskDueDate("");
-                                                setCreateTaskModalOpen(true);
-                                            }}
-                                            className="mt-5 inline-flex items-center justify-center rounded-lg bg-[var(--primary)] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--primary-hover)]"
-                                        >
-                                            Add your first task
-                                        </button>
-                                    ) : (
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                setSearch("");
-                                                setStatusFilter("ALL");
-                                                setPriorityFilter("ALL");
-                                            }}
-                                            className="mt-5 inline-flex items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-sm font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--surface-subtle)]"
-                                        >
-                                            Clear search and filters
-                                        </button>
-                                    )}
-                                </div>
-                            )}
-
-                            {!tasksLoading && !tasksError && filteredTasks.length > 0 && (
-                                <div className="mt-4 overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)]">
-                                    <div className="hidden border-b border-[var(--border)] px-5 py-3 text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)] md:grid md:grid-cols-[minmax(0,2fr)_150px_110px_100px_40px] md:gap-4">
-                                        <div>Task</div>
-                                        <div>Status</div>
-                                        <div>Priority</div>
-                                        <div>Assignee</div>
-                                        <div />
-                                    </div>
-
-                                    <div className="divide-y divide-[var(--border)]">
-                                        {filteredTasks.map((task) => (
-                                            <button
-                                                key={task.id}
-                                                type="button"
-                                                onClick={() => router.push(
-                                                    `/projects/${projectId}/tasks/${task.id}`
-                                                )}
-                                                className="grid w-full gap-4 px-5 py-4 text-left transition hover:bg-[var(--surface-subtle)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--primary)] md:grid-cols-[minmax(0,2fr)_150px_110px_100px_40px] md:items-center"
-                                            >
-                                                <div className="min-w-0">
-                                                    <p className="truncate text-sm font-semibold">
-                                                        {task.title}
-                                                    </p>
-
-                                                    <p className="mt-1 truncate text-xs text-[var(--text-muted)]">
-                                                        {task.description ??
-                                                            `Part of ${project?.name ?? "this project"}`}
-                                                    </p>
-                                                </div>
-
-                                                <div className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
-                                                    {getStatusIcon(
-                                                        task.status === "TODO"
-                                                            ? "To Do"
-                                                            : task.status === "IN_PROGRESS"
-                                                            ? "In Progress"
-                                                            : task.status === "DONE"
-                                                            ? "Done"
-                                                            : task.status
-                                                    )}
-
-                                                    <span>
-                                                        {task.status === "TODO"
-                                                            ? "To Do"
-                                                            : task.status === "IN_PROGRESS"
-                                                            ? "In Progress"
-                                                            : task.status === "DONE"
-                                                            ? "Done"
-                                                            : task.status}
-                                                    </span>
-                                                </div>
-
-                                                <div>
-                                                    <span
-                                                        className={`inline-flex rounded-md px-2 py-1 text-xs font-medium ${
-                                                            task.priority === "HIGH"
-                                                                ? "bg-red-50 text-red-600"
-                                                                : task.priority === "MEDIUM"
-                                                                ? "bg-amber-50 text-amber-600"
-                                                                : task.priority === "URGENT"
-                                                                ? "bg-red-100 text-red-700"
-                                                                : "bg-gray-100 text-gray-600"
-                                                        }`}
+                                            <div className="divide-y divide-[var(--border)]">
+                                                {filteredTasks.map((task) => (
+                                                    <button
+                                                        key={task.id}
+                                                        type="button"
+                                                        onClick={() => router.push(
+                                                            `/projects/${projectId}/tasks/${task.id}`
+                                                        )}
+                                                        className="grid w-full gap-4 px-5 py-4 text-left transition hover:bg-[var(--surface-subtle)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--primary)] md:grid-cols-[minmax(0,2fr)_150px_110px_100px_40px] md:items-center"
                                                     >
-                                                        {task.priority}
-                                                    </span>
-                                                </div>
+                                                        <div className="min-w-0">
+                                                            <p className="truncate text-sm font-semibold">
+                                                                {task.title}
+                                                            </p>
 
-                                                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--surface-subtle)] text-xs font-semibold text-[var(--primary)]">
-                                                    {task.assigneeId
-                                                        ? task.assigneeId
-                                                            .slice(0, 2)
-                                                            .toUpperCase()
-                                                        : "—"}
-                                                </div>
+                                                            <p className="mt-1 truncate text-xs text-[var(--text-muted)]">
+                                                                {task.description ??
+                                                                    `Part of ${project?.name ?? "this project"}`}
+                                                            </p>
+                                                        </div>
 
-                                                <div className="hidden text-[var(--text-muted)] md:block">
-                                                    <MoreHorizontal size={18} />
-                                                </div>
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
+                                                        <div className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
+                                                            {getStatusIcon(
+                                                                task.status === "TODO"
+                                                                    ? "To Do"
+                                                                    : task.status === "IN_PROGRESS"
+                                                                    ? "In Progress"
+                                                                    : task.status === "DONE"
+                                                                    ? "Done"
+                                                                    : task.status
+                                                            )}
+
+                                                            <span>
+                                                                {task.status === "TODO"
+                                                                    ? "To Do"
+                                                                    : task.status === "IN_PROGRESS"
+                                                                    ? "In Progress"
+                                                                    : task.status === "DONE"
+                                                                    ? "Done"
+                                                                    : task.status}
+                                                            </span>
+                                                        </div>
+
+                                                        <div>
+                                                            <span
+                                                                className={`inline-flex rounded-md px-2 py-1 text-xs font-medium ${
+                                                                    task.priority === "HIGH"
+                                                                        ? "bg-red-50 text-red-600"
+                                                                        : task.priority === "MEDIUM"
+                                                                        ? "bg-amber-50 text-amber-600"
+                                                                        : task.priority === "URGENT"
+                                                                        ? "bg-red-100 text-red-700"
+                                                                        : "bg-gray-100 text-gray-600"
+                                                                }`}
+                                                            >
+                                                                {task.priority}
+                                                            </span>
+                                                        </div>
+
+                                                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--surface-subtle)] text-xs font-semibold text-[var(--primary)]">
+                                                            {task.assigneeId
+                                                                ? task.assignee?.name
+                                                                    .slice(0, 2)
+                                                                    .toUpperCase()
+                                                                : "—"}
+                                                        </div>
+
+                                                        <div className="hidden text-[var(--text-muted)] md:block">
+                                                            <MoreHorizontal size={18} />
+                                                        </div>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </>
                             )}
                         </>
                     )}
+
+                    {activeView === "board" && (
+                        <div className="mt-6">
+                            <div className="mb-4 flex items-center justify-between">
+                                <div>
+                                    <h2 className="text-base font-semibold text-[var(--text-primary)]">
+                                        Board
+                                    </h2>
+
+                                    <p className="mt-1 text-sm text-[var(--text-secondary)]">
+                                        Track tasks by their current status.
+                                    </p>
+                                </div>
+
+                                <p className="text-xs text-[var(--text-muted)]">
+                                    {filteredTasks.length}{" "}
+                                    {filteredTasks.length === 1
+                                        ? "task"
+                                        : "tasks"}
+                                </p>
+                            </div>
+
+                            <div className="overflow-x-auto pb-4">
+                                <div className="grid min-w-[1000px] grid-cols-4 gap-4">
+                                    {[
+                                        {
+                                            value: "TODO",
+                                            label: "To Do",
+                                        },
+                                        {
+                                            value: "IN_PROGRESS",
+                                            label: "In Progress",
+                                        },
+                                        {
+                                            value: "REVIEW",
+                                            label: "Review",
+                                        },
+                                        {
+                                            value: "DONE",
+                                            label: "Done",
+                                        },
+                                    ].map((column) => {
+                                        const columnTasks =
+                                            filteredTasks.filter(
+                                                (task) =>
+                                                    task.status ===
+                                                    column.value
+                                            );
+
+                                        return (
+                                            <div
+                                                key={column.value}
+                                                className="min-h-[420px] rounded-xl border border-[var(--border)] bg-[var(--surface-subtle)] p-3"
+                                            >
+                                                <div className="mb-3 flex items-center justify-between px-1">
+                                                    <h3 className="text-sm font-semibold text-[var(--text-primary)]">
+                                                        {column.label}
+                                                    </h3>
+
+                                                    <span className="rounded-md bg-[var(--surface)] px-2 py-1 text-xs font-medium text-[var(--text-muted)]">
+                                                        {columnTasks.length}
+                                                    </span>
+                                                </div>
+
+                                                <div className="space-y-3">
+                                                    {columnTasks.length ===
+                                                    0 ? (
+                                                        <div className="rounded-lg border border-dashed border-[var(--border)] bg-[var(--surface)] px-4 py-8 text-center">
+                                                            <p className="text-xs text-[var(--text-muted)]">
+                                                                No tasks
+                                                            </p>
+                                                        </div>
+                                                    ) : (
+                                                        columnTasks.map(
+                                                            (task) => (
+                                                                <button
+                                                                    key={
+                                                                        task.id
+                                                                    }
+                                                                    type="button"
+                                                                    onClick={() =>
+                                                                        router.push(
+                                                                            `/projects/${projectId}/tasks/${task.id}`
+                                                                        )
+                                                                    }
+                                                                    className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4 text-left transition hover:border-[var(--primary)] hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
+                                                                >
+                                                                    <div className="flex items-start justify-between gap-3">
+                                                                        <p className="min-w-0 text-sm font-semibold text-[var(--text-primary)]">
+                                                                            {
+                                                                                task.title
+                                                                            }
+                                                                        </p>
+
+                                                                        <span
+                                                                            className={`shrink-0 rounded-md px-2 py-1 text-[11px] font-medium ${
+                                                                                task.priority ===
+                                                                                "URGENT"
+                                                                                    ? "bg-red-100 text-red-700"
+                                                                                    : task.priority ===
+                                                                                    "HIGH"
+                                                                                    ? "bg-red-50 text-red-600"
+                                                                                    : task.priority ===
+                                                                                    "MEDIUM"
+                                                                                    ? "bg-amber-50 text-amber-600"
+                                                                                    : "bg-gray-100 text-gray-600"
+                                                                            }`}
+                                                                        >
+                                                                            {task.priority ===
+                                                                            "URGENT"
+                                                                                ? "Urgent"
+                                                                                : task.priority ===
+                                                                                "HIGH"
+                                                                                ? "High"
+                                                                                : task.priority ===
+                                                                                "MEDIUM"
+                                                                                ? "Medium"
+                                                                                : "Low"}
+                                                                        </span>
+                                                                    </div>
+
+                                                                    {task.description && (
+                                                                        <p className="mt-2 line-clamp-2 text-xs leading-5 text-[var(--text-secondary)]">
+                                                                            {
+                                                                                task.description
+                                                                            }
+                                                                        </p>
+                                                                    )}
+
+                                                                    <div className="mt-4 flex items-center justify-between gap-3 border-t border-[var(--border)] pt-3">
+                                                                        <div className="flex min-w-0 items-center gap-2">
+                                                                            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--surface-subtle)] text-[10px] font-semibold text-[var(--text-secondary)]">
+                                                                                {task.assignee?.name
+                                                                                    ? task.assignee.name
+                                                                                        .slice(
+                                                                                            0,
+                                                                                            2
+                                                                                        )
+                                                                                        .toUpperCase()
+                                                                                    : "—"}
+                                                                            </div>
+
+                                                                            <span className="truncate text-xs text-[var(--text-secondary)]">
+                                                                                {task.assignee?.name ??
+                                                                                    "Unassigned"}
+                                                                            </span>
+                                                                        </div>
+
+                                                                        {task.dueDate && (
+                                                                            <span className="shrink-0 text-xs text-[var(--text-muted)]">
+                                                                                {new Date(
+                                                                                    task.dueDate
+                                                                                ).toLocaleDateString()}
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                </button>
+                                                            )
+                                                        )
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {activeView === "activity" && (
+                        <div className="mt-6">
+                            <div className="mb-5">
+                                <h2 className="text-base font-semibold text-[var(--text-primary)]">
+                                    Activity
+                                </h2>
+
+                                <p className="mt-1 text-sm text-[var(--text-secondary)]">
+                                    Recent activity grouped by task.
+                                </p>
+                            </div>
+
+                            {activitiesLoading && (
+                                <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-6">
+                                    <div className="h-4 w-32 animate-pulse rounded bg-[var(--surface-subtle)]" />
+
+                                    <div className="mt-4 h-3 w-64 animate-pulse rounded bg-[var(--surface-subtle)]" />
+
+                                    <div className="mt-3 h-3 w-48 animate-pulse rounded bg-[var(--surface-subtle)]" />
+                                </div>
+                            )}
+
+                            {activitiesError && (
+                                <div
+                                    role="alert"
+                                    className="rounded-xl border border-red-200 bg-red-50 p-5"
+                                >
+                                    <p className="text-sm font-medium text-red-800">
+                                        Unable to load activity.
+                                    </p>
+
+                                    <p className="mt-1 text-sm text-red-700">
+                                        {activitiesError}
+                                    </p>
+                                </div>
+                            )}
+
+                            {!activitiesLoading &&
+                                !activitiesError &&
+                                tasks.length === 0 && (
+                                    <div className="rounded-xl border border-dashed border-[var(--border)] bg-[var(--surface)] p-10 text-center">
+                                        <p className="text-sm font-medium text-[var(--text-primary)]">
+                                            No tasks yet
+                                        </p>
+
+                                        <p className="mt-1 text-sm text-[var(--text-secondary)]">
+                                            Activity will appear here once tasks are created.
+                                        </p>
+                                    </div>
+                                )}
+
+                            {!activitiesLoading &&
+                                !activitiesError &&
+                                tasks.length > 0 && (
+                                    <div className="space-y-5">
+                                        {tasks.map((task) => {
+                                            const taskActivities =
+                                                activities
+                                                    .filter(
+                                                        (activity) =>
+                                                            activity.taskId ===
+                                                            task.id
+                                                    )
+                                                    .sort(
+                                                        (first, second) =>
+                                                            new Date(
+                                                                second.createdAt
+                                                            ).getTime() -
+                                                            new Date(
+                                                                first.createdAt
+                                                            ).getTime()
+                                                    );
+
+                                            return (
+                                                <div
+                                                    key={task.id}
+                                                    className="rounded-xl border border-[var(--border)] bg-[var(--surface)]"
+                                                >
+                                                    <div className="border-b border-[var(--border)] px-5 py-4">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() =>
+                                                                router.push(
+                                                                    `/projects/${projectId}/tasks/${task.id}`
+                                                                )
+                                                            }
+                                                            className="text-left text-sm font-semibold text-[var(--text-primary)] hover:text-[var(--primary)]"
+                                                        >
+                                                            {task.title}
+                                                        </button>
+
+                                                        <p className="mt-1 text-xs text-[var(--text-muted)]">
+                                                            {taskActivities.length}{" "}
+                                                            {taskActivities.length ===
+                                                            1
+                                                                ? "activity"
+                                                                : "activities"}
+                                                        </p>
+                                                    </div>
+
+                                                    {taskActivities.length ===
+                                                    0 ? (
+                                                        <div className="px-5 py-6">
+                                                            <p className="text-sm text-[var(--text-muted)]">
+                                                                No activity yet.
+                                                            </p>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="divide-y divide-[var(--border)]">
+                                                            {taskActivities.map(
+                                                                (activity) => (
+                                                                    <div
+                                                                        key={
+                                                                            activity.id
+                                                                        }
+                                                                        className="flex gap-3 px-5 py-4"
+                                                                    >
+                                                                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--surface-subtle)] text-xs font-semibold text-[var(--text-secondary)]">
+                                                                            {activity
+                                                                                .user
+                                                                                .name
+                                                                                .slice(
+                                                                                    0,
+                                                                                    2
+                                                                                )
+                                                                                .toUpperCase()}
+                                                                        </div>
+
+                                                                        <div className="min-w-0">
+                                                                            <p className="text-sm text-[var(--text-primary)]">
+                                                                                <span className="font-semibold">
+                                                                                    {
+                                                                                        activity
+                                                                                            .user
+                                                                                            .name
+                                                                                    }
+                                                                                </span>{" "}
+                                                                                {getActivityMessage(
+                                                                                    activity
+                                                                                )}
+                                                                            </p>
+
+                                                                            <p className="mt-1 text-xs text-[var(--text-muted)]">
+                                                                                {new Date(
+                                                                                    activity.createdAt
+                                                                                ).toLocaleString()}
+                                                                            </p>
+                                                                        </div>
+                                                                    </div>
+                                                                )
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                        </div>
+                    )}                                        
 
                     {createTaskModalOpen && (
                         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/30 px-4 py-8 backdrop-blur-sm">
@@ -1051,6 +1534,100 @@ export default function ProjectDetailsPage() {
                             </div>
                         </div>
                     )}
+
+                    {editProjectModalOpen && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+                            <div className="w-full max-w-md rounded-xl bg-[var(--surface)] p-6 shadow-xl">
+                                <div className="mb-5">
+                                    <h2 className="text-lg font-semibold text-[var(--text-primary)]">
+                                        Edit Project
+                                    </h2>
+
+                                    <p className="mt-1 text-sm text-[var(--text-secondary)]">
+                                        Update the project name and description.
+                                    </p>
+                                </div>
+
+                                <form
+                                    onSubmit={handleUpdateProject}
+                                    className="space-y-4"
+                                >
+                                    <div>
+                                        <label
+                                            htmlFor="project-name"
+                                            className="mb-1.5 block text-sm font-medium text-[var(--text-primary)]"
+                                        >
+                                            Project name
+                                        </label>
+
+                                        <input
+                                            id="project-name"
+                                            type="text"
+                                            value={projectName}
+                                            onChange={(event) =>
+                                                setProjectName(
+                                                    event.target.value
+                                                )
+                                            }
+                                            className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-sm outline-none focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20"
+                                            required
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label
+                                            htmlFor="project-description"
+                                            className="mb-1.5 block text-sm font-medium text-[var(--text-primary)]"
+                                        >
+                                            Description
+                                        </label>
+
+                                        <textarea
+                                            id="project-description"
+                                            value={projectDescription}
+                                            onChange={(event) =>
+                                                setProjectDescription(
+                                                    event.target.value
+                                                )
+                                            }
+                                            rows={4}
+                                            className="w-full resize-none rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-sm outline-none focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20"
+                                        />
+                                    </div>
+
+                                    {projectFormError && (
+                                        <p className="text-sm text-red-600">
+                                            {projectFormError}
+                                        </p>
+                                    )}
+
+                                    <div className="flex justify-end gap-2 pt-2">
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                setEditProjectModalOpen(
+                                                    false
+                                                )
+                                            }
+                                            className="rounded-lg border border-[var(--border)] px-4 py-2.5 text-sm font-medium text-[var(--text-secondary)] transition hover:bg-[var(--surface-subtle)]"
+                                        >
+                                            Cancel
+                                        </button>
+
+                                        <button
+                                            type="submit"
+                                            disabled={savingProject}
+                                            className="rounded-lg bg-[var(--primary)] px-4 py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                                        >
+                                            {savingProject
+                                                ? "Saving..."
+                                                : "Save changes"}
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    )}                    
                 </div>
             </AppShell>
         </ProtectedRoute>

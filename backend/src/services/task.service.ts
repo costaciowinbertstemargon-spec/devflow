@@ -412,6 +412,16 @@ export async function getMyTasks(
     return prisma.task.findMany({
         where: {
             assigneeId: userId,
+
+            project: {
+                organization: {
+                    members: {
+                        some: {
+                            userId,
+                        },
+                    },
+                },
+            },
         },
 
         orderBy: {
@@ -485,4 +495,223 @@ export async function getTaskById(
     }
 
     return task;
+}
+
+export async function getTaskMembers(
+    taskId: string,
+    userId: string
+) {
+    const task = await prisma.task.findUnique({
+        where: {
+            id: taskId,
+        },
+        select: {
+            id: true,
+            project: {
+                select: {
+                    organizationId: true,
+                },
+            },
+        },
+    });
+
+    if (!task) {
+        throw new Error("Task not found");
+    }
+
+    const membership =
+        await prisma.organizationMember.findUnique({
+            where: {
+                userId_organizationId: {
+                    userId,
+                    organizationId:
+                        task.project.organizationId,
+                },
+            },
+        });
+
+    if (!membership) {
+        throw new Error(
+            "You are not a member of this organization"
+        );
+    }
+
+    return prisma.taskMember.findMany({
+        where: {
+            taskId,
+            user: {
+                memberships: {
+                    some: {
+                        organizationId:
+                            task.project.organizationId,
+                    },
+                },
+            },
+        },
+        include: {
+            user: {
+                select: {
+                    id: true,
+                    name: true,
+                    email: true,
+                },
+            },
+        },
+        orderBy: {
+            createdAt: "asc",
+        },
+    });
+}
+
+export async function addTaskMember(
+    taskId: string,
+    memberUserId: string,
+    requesterId: string
+) {
+    const task = await prisma.task.findUnique({
+        where: {
+            id: taskId,
+        },
+        select: {
+            id: true,
+            project: {
+                select: {
+                    organizationId: true,
+                },
+            },
+        },
+    });
+
+    if (!task) {
+        throw new Error("Task not found");
+    }
+
+    const requesterMembership =
+        await prisma.organizationMember.findUnique({
+            where: {
+                userId_organizationId: {
+                    userId: requesterId,
+                    organizationId:
+                        task.project.organizationId,
+                },
+            },
+        });
+
+    if (!requesterMembership) {
+        throw new Error(
+            "You are not a member of this organization"
+        );
+    }
+
+    const targetMembership =
+        await prisma.organizationMember.findUnique({
+            where: {
+                userId_organizationId: {
+                    userId: memberUserId,
+                    organizationId:
+                        task.project.organizationId,
+                },
+            },
+        });
+
+    if (!targetMembership) {
+        throw new Error(
+            "The selected user is not a member of this organization"
+        );
+    }
+
+    const existingMember =
+        await prisma.taskMember.findUnique({
+            where: {
+                taskId_userId: {
+                    taskId,
+                    userId: memberUserId,
+                },
+            },
+        });
+
+    if (existingMember) {
+        throw new Error(
+            "This user is already assigned to the task"
+        );
+    }
+
+    return prisma.taskMember.create({
+        data: {
+            taskId,
+            userId: memberUserId,
+        },
+        include: {
+            user: {
+                select: {
+                    id: true,
+                    name: true,
+                    email: true,
+                },
+            },
+        },
+    });
+}
+
+export async function removeTaskMember(
+    taskId: string,
+    memberUserId: string,
+    requesterId: string
+) {
+    const task = await prisma.task.findUnique({
+        where: {
+            id: taskId,
+        },
+        select: {
+            id: true,
+            project: {
+                select: {
+                    organizationId: true,
+                },
+            },
+        },
+    });
+
+    if (!task) {
+        throw new Error("Task not found");
+    }
+
+    const requesterMembership =
+        await prisma.organizationMember.findUnique({
+            where: {
+                userId_organizationId: {
+                    userId: requesterId,
+                    organizationId:
+                        task.project.organizationId,
+                },
+            },
+        });
+
+    if (!requesterMembership) {
+        throw new Error(
+            "You are not a member of this organization"
+        );
+    }
+
+    const taskMember =
+        await prisma.taskMember.findUnique({
+            where: {
+                taskId_userId: {
+                    taskId,
+                    userId: memberUserId,
+                },
+            },
+        });
+
+    if (!taskMember) {
+        throw new Error(
+            "This user is not assigned to the task"
+        );
+    }
+
+    return prisma.taskMember.delete({
+        where: {
+            id: taskMember.id,
+        },
+    });
 }

@@ -7,6 +7,9 @@ import {
     getProjectTasks,
     getTaskById,
     getMyTasks,
+    getTaskMembers,
+    addTaskMember,
+    removeTaskMember,
 } from "../services/task.service.js";
 
 export async function createTaskController(
@@ -405,6 +408,138 @@ export async function getTaskController(
         return res.status(500).json({
             status: "error",
             message: "Failed to retrieve task",
+        });
+    }
+}
+
+export async function getTaskMembersController(
+    req: AuthenticatedRequest,
+    res: Response
+) {
+    try {
+        const taskId = req.params.taskId;
+
+        if (typeof taskId !== "string") {
+            return res.status(400).json({
+                status: "error",
+                message: "Invalid task ID",
+            });
+        }
+
+        if (!req.user) {
+            return res.status(401).json({
+                status: "error",
+                message: "Authentication required",
+            });
+        }
+
+        const members = await getTaskMembers(
+            taskId,
+            req.user.userId
+        );
+
+        return res.status(200).json({
+            members,
+        });
+    } catch (error) {
+        const message =
+            error instanceof Error
+                ? error.message
+                : "Failed to get task members";
+
+        return res.status(400).json({
+            message,
+        });
+    }
+}
+
+export async function addTaskMemberController(
+    req: AuthenticatedRequest,
+    res: Response
+) {
+    try {
+        const taskId = req.params.taskId;
+
+        if (typeof taskId !== "string") {
+            return res.status(400).json({
+                status: "error",
+                message: "Invalid task ID",
+            });
+        }
+
+        const { userId: memberUserId } = req.body;
+
+        if (!req.user) {
+            return res.status(401).json({
+                status: "error",
+                message: "Authentication required",
+            });
+        }
+
+        const member =
+            await addTaskMember(
+                taskId,
+                memberUserId,
+                req.user.userId
+            );
+
+        return res.status(201).json({
+            member,
+        });
+    } catch (error) {
+        const message =
+            error instanceof Error
+                ? error.message
+                : "Failed to add task member";
+
+        return res.status(400).json({
+            message,
+        });
+    }
+}
+
+export async function removeTaskMemberController(
+    req: AuthenticatedRequest,
+    res: Response
+) {
+    try {
+        const taskId = req.params.taskId;
+        const memberUserId = req.params.userId;
+
+        if (
+            typeof taskId !== "string" ||
+            typeof memberUserId !== "string"
+        ) {
+            return res.status(400).json({
+                status: "error",
+                message: "Invalid task or user ID",
+            });
+        }
+
+        if (!req.user) {
+            return res.status(401).json({
+                status: "error",
+                message: "Authentication required",
+            });
+        }
+
+        await removeTaskMember(
+            taskId,
+            memberUserId,
+            req.user.userId
+        );
+
+        return res.status(200).json({
+            message: "Task member removed successfully",
+        });
+    } catch (error) {
+        const message =
+            error instanceof Error
+                ? error.message
+                : "Failed to remove task member";
+
+        return res.status(400).json({
+            message,
         });
     }
 }
