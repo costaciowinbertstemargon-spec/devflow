@@ -715,3 +715,228 @@ export async function removeTaskMember(
         },
     });
 }
+
+export async function archiveTask(
+    taskId: string,
+    userId: string
+) {
+    const task = await prisma.task.findUnique({
+        where: {
+            id: taskId,
+        },
+        include: {
+            project: {
+                select: {
+                    organizationId: true,
+                },
+            },
+        },
+    });
+
+    if (!task) {
+        throw new Error("Task not found");
+    }
+
+    const membership =
+        await prisma.organizationMember.findUnique({
+            where: {
+                userId_organizationId: {
+                    userId,
+                    organizationId:
+                        task.project.organizationId,
+                },
+            },
+        });
+
+    if (!membership) {
+        throw new Error(
+            "You are not a member of this organization"
+        );
+    }
+
+    if (
+        membership.role !== "OWNER" &&
+        membership.role !== "ADMIN"
+    ) {
+        throw new Error(
+            "You do not have permission to archive this task"
+        );
+    }
+
+    if (task.archivedAt) {
+        throw new Error("Task is already archived");
+    }
+
+    const updatedTask = await prisma.task.update({
+        where: {
+            id: taskId,
+        },
+        data: {
+            archivedAt: new Date(),
+        },
+        include: {
+            assignee: {
+                select: {
+                    id: true,
+                    name: true,
+                    email: true,
+                },
+            },
+        },
+    });
+
+    await prisma.activity.create({
+        data: {
+            taskId,
+            userId,
+            action: "TASK_ARCHIVED",
+        },
+    });
+
+    return updatedTask;
+}
+
+export async function restoreTask(
+    taskId: string,
+    userId: string
+) {
+    const task = await prisma.task.findUnique({
+        where: {
+            id: taskId,
+        },
+        include: {
+            project: {
+                select: {
+                    organizationId: true,
+                },
+            },
+        },
+    });
+
+    if (!task) {
+        throw new Error("Task not found");
+    }
+
+    const membership =
+        await prisma.organizationMember.findUnique({
+            where: {
+                userId_organizationId: {
+                    userId,
+                    organizationId:
+                        task.project.organizationId,
+                },
+            },
+        });
+
+    if (!membership) {
+        throw new Error(
+            "You are not a member of this organization"
+        );
+    }
+
+    if (
+        membership.role !== "OWNER" &&
+        membership.role !== "ADMIN"
+    ) {
+        throw new Error(
+            "You do not have permission to restore this task"
+        );
+    }
+
+    if (!task.archivedAt) {
+        throw new Error("Task is not archived");
+    }
+
+    const updatedTask = await prisma.task.update({
+        where: {
+            id: taskId,
+        },
+        data: {
+            archivedAt: null,
+        },
+        include: {
+            assignee: {
+                select: {
+                    id: true,
+                    name: true,
+                    email: true,
+                },
+            },
+        },
+    });
+
+    await prisma.activity.create({
+        data: {
+            taskId,
+            userId,
+            action: "TASK_RESTORED",
+        },
+    });
+
+    return updatedTask;
+}
+
+export async function getArchivedProjectTasks(
+    projectId: string,
+    userId: string
+) {
+    const project = await prisma.project.findUnique({
+        where: {
+            id: projectId,
+        },
+        select: {
+            organizationId: true,
+        },
+    });
+
+    if (!project) {
+        throw new Error("Project not found");
+    }
+
+    const membership =
+        await prisma.organizationMember.findUnique({
+            where: {
+                userId_organizationId: {
+                    userId,
+                    organizationId:
+                        project.organizationId,
+                },
+            },
+        });
+
+    if (!membership) {
+        throw new Error(
+            "You are not a member of this organization"
+        );
+    }
+
+    if (
+        membership.role !== "OWNER" &&
+        membership.role !== "ADMIN"
+    ) {
+        throw new Error(
+            "You do not have permission to view archived tasks"
+        );
+    }
+
+    return prisma.task.findMany({
+        where: {
+            projectId,
+            archivedAt: {
+                not: null,
+            },
+        },
+        orderBy: {
+            archivedAt: "desc",
+        },
+        include: {
+            assignee: {
+                select: {
+                    id: true,
+                    name: true,
+                    email: true,
+                },
+            },
+        },
+    });
+}

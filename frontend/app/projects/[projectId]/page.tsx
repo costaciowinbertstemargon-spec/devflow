@@ -3,14 +3,18 @@
 import AppShell from "@/components/AppShell";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { useAuth } from "@/components/AuthProvider";
-import { 
+import {
+    archiveTask, 
     createTask,
+    restoreTask,
+    getArchivedTasks,
     getProject,
     getTasks,
     getOrganization,
     getTaskActivities,
     updateProject, 
     updateTask,
+    
     type Project,
     type Task,
     type TaskActivity,
@@ -20,6 +24,7 @@ import {
     ArrowLeft,
     CheckCircle2,
     Circle,
+    ClipboardCheck,
     Clock3,
     Filter,
     MoreHorizontal,
@@ -33,15 +38,43 @@ import { useEffect, useState, useMemo, } from "react";
 import { useRouter } from "next/navigation";
 
 function getStatusIcon(status: string) {
-    if (status === "Done") {
-        return <CheckCircle2 size={17} />;
+    if (status === "TODO") {
+        return <Circle size={17} />;
     }
 
-    if (status === "In Progress") {
+    if (status === "IN_PROGRESS") {
         return <Clock3 size={17} />;
     }
 
+    if (status === "REVIEW") {
+        return <ClipboardCheck size={17} />;
+    }
+
+    if (status === "DONE") {
+        return <CheckCircle2 size={17} />;
+    }
+
     return <Circle size={17} />;
+}
+
+function getStatusLabel(status: string) {
+    if (status === "TODO") {
+        return "To Do";
+    }
+
+    if (status === "IN_PROGRESS") {
+        return "In Progress";
+    }
+
+    if (status === "REVIEW") {
+        return "Review";
+    }
+
+    if (status === "DONE") {
+        return "Done";
+    }
+
+    return status;
 }
 
 function getActivityMessage(
@@ -89,6 +122,9 @@ export default function ProjectDetailsPage() {
     const [tasksLoading, setTasksLoading] = useState(true);
     const [tasksError, setTasksError] = useState("");
 
+    const [archivedTasks, setArchivedTasks] = useState<Task[]>([]);
+    const [archivedLoading, setArchivedLoading] = useState(false);
+    
     const [activities, setActivities] = useState<TaskActivity[]>([]);
     const [activitiesLoading, setActivitiesLoading] = useState(true);
     const [activitiesError, setActivitiesError] = useState("");
@@ -108,12 +144,17 @@ export default function ProjectDetailsPage() {
     const [taskFormError, setTaskFormError] = useState("");
 
     const [activeView, setActiveView] =
-        useState<"tasks" | "board" | "activity">(
+        useState<"tasks" | "board" | "activity" | "archived">(
             "tasks"
         );
     const [updatingTaskId, setUpdatingTaskId] = useState<string | null>(null);
     const [openTaskMenuId, setOpenTaskMenuId] = useState<string | null>(null);
     const [taskMenuPlacement, setTaskMenuPlacement] = useState<"top" | "bottom">("bottom");
+    const [taskMenuPosition, setTaskMenuPosition] =
+        useState({
+            top: 0,
+            left: 0,
+        });
 
     const [search, setSearch] = useState("");
     const [filtersOpen, setFiltersOpen] = useState(false);
@@ -218,7 +259,7 @@ export default function ProjectDetailsPage() {
         }
 
         void loadProjectData();
-    }, [projectId]);
+    }, [projectId, user?.id]);
 
     async function handleCreateTask(
         event: React.FormEvent<HTMLFormElement>    
@@ -375,6 +416,132 @@ export default function ProjectDetailsPage() {
             setUpdatingTaskId(null);
         }
     }
+
+    async function handleArchiveTask(taskId: string) {
+        const token = getToken();
+
+        if (!token) {
+            setError("Authentication required.");
+            return;
+        }
+
+        if (!canManageTasks) {
+            setError(
+                "You do not have permission to archive this task."
+            );
+            return;
+        }
+
+        const confirmed = window.confirm(
+            "Archive this task? It will be hidden from the active project views and can be restored later by an administrator or owner."
+        );
+
+        if (!confirmed) {
+            return;
+        }
+
+        setUpdatingTaskId(taskId);
+
+        try {
+            const archivedTask = await archiveTask(
+                taskId,
+                token
+            );
+
+            setTasks((currentTasks) =>
+                currentTasks.filter(
+                    (task) => task.id !== taskId
+                )
+            );
+
+            setArchivedTasks((currentTasks) => [
+                archivedTask,
+                ...currentTasks.filter(
+                    (task) => task.id !== taskId
+                ),
+            ]);
+
+            setOpenTaskMenuId(null);
+        } catch (error) {
+            setTasksError(
+                error instanceof Error
+                    ? error.message
+                    : "Failed to archive task."
+            );
+        } finally {
+            setUpdatingTaskId(null);
+        }
+    }
+
+    async function loadArchivedTasks() {
+        const token = getToken();
+
+        if (!token) {
+            setError("Authentication required.");
+            return;
+        }
+
+        if (!canManageTasks) {
+            return;
+        }
+
+        setArchivedLoading(true);
+
+        try {
+            const result = await getArchivedTasks(
+                projectId,
+                token
+            );
+
+            setArchivedTasks(result);
+        } catch (error) {
+            setTasksError(
+                error instanceof Error
+                    ? error.message
+                    : "Failed to load archived tasks."
+            );
+        } finally {
+            setArchivedLoading(false);
+        }
+    }
+
+    const handleRestoreTask = async (
+        taskId: string
+    ) => {
+        const token = getToken();
+        
+        if (!token) {
+            return;
+        }
+
+        try {
+            setUpdatingTaskId(taskId);
+
+            await restoreTask(taskId, token);
+
+            setArchivedTasks((currentTasks) =>
+                currentTasks.filter(
+                    (task) => task.id !== taskId
+                )
+            );
+
+            const refreshedTasks = await getTasks(
+                projectId,
+                token
+            );
+
+            setTasks(refreshedTasks);
+
+            setOpenTaskMenuId(null);
+        } catch (error) {
+            console.error(
+                "Failed to restore task:",
+                error
+            );
+        } finally {
+            setUpdatingTaskId(null);
+        }
+    };
 
     const filteredTasks = useMemo(() => {
         const query = search.trim().toLowerCase();
@@ -696,6 +863,22 @@ export default function ProjectDetailsPage() {
                                     >
                                         Activity
                                     </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setActiveView("archived");
+                                            void loadArchivedTasks();
+                                        }}
+                                        className={
+                                            activeView === "archived"
+                                                ? "rounded-lg bg-[var(--primary)] px-3.5 py-2.5 text-sm font-semibold text-white"
+                                                : "rounded-lg px-3.5 py-2.5 text-sm font-medium text-[var(--text-secondary)] transition hover:bg-[var(--surface-subtle)]"
+                                        }
+                                    >
+                                        Archived
+                                    </button>
+
                                 </div>
 
                                 {canManageTasks && (
@@ -1032,24 +1215,10 @@ export default function ProjectDetailsPage() {
                                                             }
                                                             className="flex items-center gap-2 text-left text-sm text-[var(--text-secondary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] md:text-left"
                                                         >
-                                                            {getStatusIcon(
-                                                                task.status === "TODO"
-                                                                    ? "To Do"
-                                                                    : task.status === "IN_PROGRESS"
-                                                                    ? "In Progress"
-                                                                    : task.status === "DONE"
-                                                                    ? "Done"
-                                                                    : task.status
-                                                            )}
+                                                            {getStatusIcon(task.status)}
 
                                                             <span>
-                                                                {task.status === "TODO"
-                                                                    ? "To Do"
-                                                                    : task.status === "IN_PROGRESS"
-                                                                    ? "In Progress"
-                                                                    : task.status === "DONE"
-                                                                    ? "Done"
-                                                                    : task.status}
+                                                                {getStatusLabel(task.status)}
                                                             </span>
                                                         </button>
 
@@ -1092,14 +1261,26 @@ export default function ProjectDetailsPage() {
                                                                         event.currentTarget.getBoundingClientRect();
 
                                                                     const menuHeight = 220;
+                                                                    const menuWidth = 176;
                                                                     const spaceBelow =
-                                                                        window.innerHeight - buttonRect.bottom;
+                                                                        window.innerHeight -
+                                                                        buttonRect.bottom;
 
-                                                                    setTaskMenuPlacement(
+                                                                    const placement =
                                                                         spaceBelow < menuHeight
                                                                             ? "top"
-                                                                            : "bottom"
-                                                                    );
+                                                                            : "bottom";
+
+                                                                    setTaskMenuPlacement(placement);
+
+                                                                    setTaskMenuPosition({
+                                                                        top:
+                                                                            placement === "top"
+                                                                                ? buttonRect.top - menuHeight
+                                                                                : buttonRect.bottom + 4,
+                                                                        left:
+                                                                            buttonRect.right - menuWidth,
+                                                                    });
 
                                                                     setOpenTaskMenuId(task.id);
                                                                 }}
@@ -1183,11 +1364,11 @@ export default function ProjectDetailsPage() {
                                                                             <button
                                                                                 type="button"
                                                                                 onClick={() => {
-                                                                                    setOpenTaskMenuId(null);
+                                                                                    void handleArchiveTask(task.id);
                                                                                 }}
                                                                                 className="flex w-full items-center px-3 py-2.5 text-left text-sm text-red-600 transition hover:bg-red-50"
                                                                             >
-                                                                                Delete
+                                                                                Archive
                                                                             </button>
                                                                         </>
                                                                     )}
@@ -1225,7 +1406,7 @@ export default function ProjectDetailsPage() {
                                 </p>
                             </div>
 
-                            <div className="overflow-x-auto pb-4">
+                            <div className="relative overflow-x-auto overflow-y-visible pb-4">
                                 <div className="grid min-w-[1000px] grid-cols-4 gap-4">
                                     {[
                                         {
@@ -1279,49 +1460,170 @@ export default function ProjectDetailsPage() {
                                                         columnTasks.map((task) => (
                                                             <div
                                                                 key={task.id}
-                                                                className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4 transition hover:border-[var(--primary)]"
+                                                                className="relative rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4 transition hover:border-[var(--primary)]"
                                                             >
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() =>
-                                                                        router.push(
-                                                                            `/projects/${projectId}/tasks/${task.id}`
-                                                                        )
-                                                                    }
-                                                                    className="w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
-                                                                >
-                                                                    <div className="flex items-start justify-between gap-3">
-                                                                        <p className="min-w-0 text-sm font-semibold text-[var(--text-primary)]">
+                                                                <div className="flex items-start justify-between gap-3">
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() =>
+                                                                            router.push(
+                                                                                `/projects/${projectId}/tasks/${task.id}`
+                                                                            )
+                                                                        }
+                                                                        className="min-w-0 flex-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
+                                                                    >
+                                                                        <p className="truncate text-sm font-semibold text-[var(--text-primary)]">
                                                                             {task.title}
                                                                         </p>
+                                                                    </button>
 
-                                                                        <span
-                                                                            className={`shrink-0 rounded-md px-2 py-1 text-[11px] font-medium ${
-                                                                                task.priority === "URGENT"
-                                                                                    ? "bg-red-100 text-red-700"
-                                                                                    : task.priority === "HIGH"
-                                                                                    ? "bg-red-50 text-red-600"
-                                                                                    : task.priority === "MEDIUM"
-                                                                                    ? "bg-amber-50 text-amber-600"
-                                                                                    : "bg-gray-100 text-gray-600"
-                                                                            }`}
+                                                                    <div className="relative shrink-0">
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={(event) => {
+                                                                                event.stopPropagation();
+
+                                                                                if (
+                                                                                    openTaskMenuId === task.id
+                                                                                ) {
+                                                                                    setOpenTaskMenuId(null);
+                                                                                    return;
+                                                                                }
+
+                                                                                const buttonRect =
+                                                                                    event.currentTarget.getBoundingClientRect();
+
+                                                                                const menuHeight = 220;
+                                                                                const spaceBelow =
+                                                                                    window.innerHeight -
+                                                                                    buttonRect.bottom;
+
+                                                                                setTaskMenuPlacement(
+                                                                                    spaceBelow < menuHeight
+                                                                                        ? "top"
+                                                                                        : "bottom"
+                                                                                );
+
+                                                                                setOpenTaskMenuId(task.id);
+                                                                            }}
+                                                                            className="rounded-md p-1.5 text-[var(--text-muted)] transition hover:bg-[var(--surface-subtle)] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+                                                                            aria-label={`Actions for ${task.title}`}
+                                                                            aria-expanded={
+                                                                                openTaskMenuId === task.id
+                                                                            }
                                                                         >
-                                                                            {task.priority === "URGENT"
-                                                                                ? "Urgent"
-                                                                                : task.priority === "HIGH"
-                                                                                ? "High"
-                                                                                : task.priority === "MEDIUM"
-                                                                                ? "Medium"
-                                                                                : "Low"}
-                                                                        </span>
-                                                                    </div>
+                                                                            <MoreHorizontal size={17} />
+                                                                        </button>
 
-                                                                    {task.description && (
-                                                                        <p className="mt-2 line-clamp-2 text-xs leading-5 text-[var(--text-secondary)]">
-                                                                            {task.description}
-                                                                        </p>
-                                                                    )}
-                                                                </button>
+                                                                        {openTaskMenuId === task.id && (
+                                                                            <div
+                                                                                className="fixed z-[100] w-44 overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface)] py-1 shadow-lg"
+                                                                                style={{
+                                                                                    top: taskMenuPosition.top,
+                                                                                    left: taskMenuPosition.left,
+                                                                                }}
+                                                                            >
+                                                                                <button
+                                                                                    type="button"
+                                                                                    onClick={() => {
+                                                                                        setOpenTaskMenuId(null);
+
+                                                                                        router.push(
+                                                                                            `/projects/${projectId}/tasks/${task.id}`
+                                                                                        );
+                                                                                    }}
+                                                                                    className="flex w-full items-center px-3 py-2.5 text-left text-sm text-[var(--text-primary)] transition hover:bg-[var(--surface-subtle)]"
+                                                                                >
+                                                                                    Open
+                                                                                </button>
+
+                                                                                <button
+                                                                                    type="button"
+                                                                                    onClick={() => {
+                                                                                        setOpenTaskMenuId(null);
+
+                                                                                        router.push(
+                                                                                            `/projects/${projectId}/tasks/${task.id}`
+                                                                                        );
+                                                                                    }}
+                                                                                    className="flex w-full items-center px-3 py-2.5 text-left text-sm text-[var(--text-primary)] transition hover:bg-[var(--surface-subtle)]"
+                                                                                >
+                                                                                    Edit
+                                                                                </button>
+
+                                                                                <button
+                                                                                    type="button"
+                                                                                    onClick={() => {
+                                                                                        setOpenTaskMenuId(null);
+
+                                                                                        router.push(
+                                                                                            `/projects/${projectId}/tasks/${task.id}`
+                                                                                        );
+                                                                                    }}
+                                                                                    className="flex w-full items-center px-3 py-2.5 text-left text-sm text-[var(--text-primary)] transition hover:bg-[var(--surface-subtle)]"
+                                                                                >
+                                                                                    Change status
+                                                                                </button>
+
+                                                                                <button
+                                                                                    type="button"
+                                                                                    onClick={() => {
+                                                                                        setOpenTaskMenuId(null);
+
+                                                                                        router.push(
+                                                                                            `/projects/${projectId}/tasks/${task.id}`
+                                                                                        );
+                                                                                    }}
+                                                                                    className="flex w-full items-center px-3 py-2.5 text-left text-sm text-[var(--text-primary)] transition hover:bg-[var(--surface-subtle)]"
+                                                                                >
+                                                                                    Assign
+                                                                                </button>
+
+                                                                                {canManageTasks && (
+                                                                                    <>
+                                                                                        <div className="my-1 border-t border-[var(--border)]" />
+
+                                                                                        <button
+                                                                                            type="button"
+                                                                                            onClick={() => {
+                                                                                                void handleArchiveTask(task.id);
+                                                                                            }}
+                                                                                            className="flex w-full items-center px-3 py-2.5 text-left text-sm text-red-600 transition hover:bg-red-50"
+                                                                                        >
+                                                                                            Archive
+                                                                                        </button>
+                                                                                    </>
+                                                                                )}
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+
+                                                                <span
+                                                                    className={`mt-3 inline-flex rounded-md px-2 py-1 text-[11px] font-medium ${
+                                                                        task.priority === "URGENT"
+                                                                            ? "bg-red-100 text-red-700"
+                                                                            : task.priority === "HIGH"
+                                                                            ? "bg-red-50 text-red-600"
+                                                                            : task.priority === "MEDIUM"
+                                                                            ? "bg-amber-50 text-amber-600"
+                                                                            : "bg-gray-100 text-gray-600"
+                                                                    }`}
+                                                                >
+                                                                    {task.priority === "URGENT"
+                                                                        ? "Urgent"
+                                                                        : task.priority === "HIGH"
+                                                                        ? "High"
+                                                                        : task.priority === "MEDIUM"
+                                                                        ? "Medium"
+                                                                        : "Low"}
+                                                                </span>
+
+                                                                {task.description && (
+                                                                    <p className="mt-2 line-clamp-2 text-xs leading-5 text-[var(--text-secondary)]">
+                                                                        {task.description}
+                                                                    </p>
+                                                                )}
 
                                                                 <div className="mt-4 flex items-center justify-between gap-3 border-t border-[var(--border)] pt-3">
                                                                     <div className="flex min-w-0 items-center gap-2">
@@ -1373,12 +1675,15 @@ export default function ProjectDetailsPage() {
                                                                         <option value="TODO">
                                                                             To Do
                                                                         </option>
+
                                                                         <option value="IN_PROGRESS">
                                                                             In Progress
                                                                         </option>
+
                                                                         <option value="REVIEW">
                                                                             Review
                                                                         </option>
+
                                                                         <option value="DONE">
                                                                             Done
                                                                         </option>
@@ -1554,6 +1859,91 @@ export default function ProjectDetailsPage() {
                                         })}
                                     </div>
                                 )}
+                        </div>
+                    )}
+
+                    {activeView === "archived" && (
+                        <div className="mt-4 overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)]">
+                            <div className="border-b border-[var(--border)] px-5 py-4">
+                                <div className="flex items-center justify-between gap-4">
+                                    <div>
+                                        <h2 className="text-base font-semibold text-[var(--text-primary)]">
+                                            Archived Tasks
+                                        </h2>
+
+                                        <p className="mt-1 text-sm text-[var(--text-muted)]">
+                                            Tasks that have been archived from this project.
+                                        </p>
+                                    </div>
+
+                                    <div className="rounded-full bg-[var(--surface-subtle)] px-3 py-1 text-xs font-semibold text-[var(--text-secondary)]">
+                                        {archivedTasks.length} archived
+                                    </div>
+                                </div>
+                            </div>
+
+                            {archivedLoading ? (
+                                <div className="px-5 py-12 text-center text-sm text-[var(--text-muted)]">
+                                    Loading archived tasks...
+                                </div>
+                            ) : archivedTasks.length === 0 ? (
+                                <div className="px-5 py-12 text-center">
+                                    <p className="text-sm font-medium text-[var(--text-secondary)]">
+                                        No archived tasks
+                                    </p>
+
+                                    <p className="mt-1 text-sm text-[var(--text-muted)]">
+                                        Tasks you archive will appear here.
+                                    </p>
+                                </div>
+                            ) : (
+                                <div className="divide-y divide-[var(--border)]">
+                                    {archivedTasks.map((task) => (
+                                        <div
+                                            key={task.id}
+                                            className="flex items-center justify-between gap-4 px-5 py-4"
+                                        >
+                                            <div className="min-w-0">
+                                                <h3 className="truncate text-sm font-semibold text-[var(--text-primary)]">
+                                                    {task.title}
+                                                </h3>
+
+                                                {task.description && (
+                                                    <p className="mt-1 truncate text-sm text-[var(--text-muted)]">
+                                                        {task.description}
+                                                    </p>
+                                                )}
+
+                                                <div className="mt-2 flex items-center gap-3 text-xs text-[var(--text-muted)]">
+                                                    <span className="inline-flex items-center gap-1">
+                                                        {getStatusIcon(task.status)}
+                                                        {getStatusLabel(task.status)}
+                                                    </span>
+
+                                                    <span>
+                                                        {task.priority}
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    handleRestoreTask(task.id)
+                                                }
+                                                disabled={
+                                                    updatingTaskId === task.id
+                                                }
+                                                className="shrink-0 rounded-lg border border-[var(--border)] px-3.5 py-2 text-sm font-medium text-[var(--text-secondary)] transition hover:bg-[var(--surface-subtle)]"
+                                            >
+                                                {updatingTaskId === task.id
+                                                    ? "Restoring..."
+                                                    : "Restore"}
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     )}                                        
 

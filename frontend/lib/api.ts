@@ -419,6 +419,7 @@ export interface Task {
         name: string;
         organizationId: string;
     } | null;
+    archivedAt: string | null;
 }
 
 export async function getTasks(
@@ -480,6 +481,111 @@ export async function getMyTasks(
     }
 
     return data.tasks ?? [];
+}
+
+export async function archiveTask(
+    taskId: string,
+    token: string
+): Promise<Task> {
+    const response = await fetch(
+        `${API_URL}/tasks/${taskId}/archive`,
+        {
+            method: "POST",
+            headers: {
+                Authorization: `Bearer ${token}`,
+            },
+            cache: "no-store",
+        }
+    );
+
+    const data =
+        (await response.json()) as {
+            status?: string;
+            message?: string;
+            task?: Task;
+        };
+
+    if (!response.ok) {
+        throw new Error(
+            data.message ||
+                "Failed to archive task"
+        );
+    }
+
+    if (!data.task) {
+        throw new Error(
+            "Archived task data was not returned."
+        );
+    }
+
+    return data.task;
+}
+
+export async function getArchivedTasks(
+    projectId: string,
+    token: string
+): Promise<Task[]> {
+    const response = await fetch(
+        `${API_URL}/projects/${projectId}/tasks/archived`,
+        {
+            method: "GET",
+            headers: {
+                Authorization: `Bearer ${token}`,
+            },
+            cache: "no-store",
+        }
+    );
+
+    const data = (await response.json()) as TasksResponse & {
+        message?: string;
+    };
+
+    if (!response.ok) {
+        throw new Error(
+            data.message ||
+                "Failed to load archived tasks"
+        );
+    }
+
+    return data.tasks;
+}
+
+export async function restoreTask(
+    taskId: string,
+    token: string
+): Promise<Task> {
+    const response = await fetch(
+        `${API_URL}/tasks/${taskId}/restore`,
+        {
+            method: "PATCH",
+            headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json",
+            },
+            cache: "no-store",
+        }
+    );
+
+    const data = (await response.json()) as {
+        status?: string;
+        message?: string;
+        task?: Task;
+    };
+
+    if (!response.ok) {
+        throw new Error(
+            data.message ||
+                "Failed to restore task"
+        );
+    }
+
+    if (!data.task) {
+        throw new Error(
+            "Task data was not returned."
+        );
+    }
+
+    return data.task;
 }
 
 {/* Create Update Tasks */}

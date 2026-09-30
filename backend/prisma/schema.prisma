@@ -34,6 +34,8 @@ enum ActivityAction {
   STATUS_CHANGED
   PRIORITY_CHANGED
   COMMENT_ADDED
+  TASK_ARCHIVED
+  TASK_RESTORED
 }
 
 enum NotificationType {
@@ -112,6 +114,8 @@ model Task {
   priority    TaskPriority @default(MEDIUM)
 
   dueDate     DateTime?
+
+  archivedAt DateTime?
 
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt

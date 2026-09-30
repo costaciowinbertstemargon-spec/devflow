@@ -14,6 +14,9 @@ import {
     getTaskMembersController,
     addTaskMemberController,
     removeTaskMemberController,
+    getArchivedProjectTasksController,
+    archiveTaskController,
+    restoreTaskController,
 } from "../controllers/task.controller.js";
 
 const router = Router();
@@ -66,6 +69,24 @@ router.delete(
     "/tasks/:taskId/members/:userId",
     authenticate,
     removeTaskMemberController
+);
+
+router.get(
+    "/projects/:projectId/tasks/archived",
+    authenticate,
+    getArchivedProjectTasksController
+);
+
+router.post(
+    "/tasks/:taskId/archive",
+    authenticate,
+    archiveTaskController
+);
+
+router.patch(
+    "/tasks/:taskId/restore",
+    authenticate,
+    restoreTaskController
 );
 
 export default router;

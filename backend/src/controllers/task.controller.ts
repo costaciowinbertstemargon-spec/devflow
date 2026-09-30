@@ -10,6 +10,9 @@ import {
     getTaskMembers,
     addTaskMember,
     removeTaskMember,
+    archiveTask,
+    restoreTask,
+    getArchivedProjectTasks,
 } from "../services/task.service.js";
 
 export async function createTaskController(
@@ -540,6 +543,217 @@ export async function removeTaskMemberController(
 
         return res.status(400).json({
             message,
+        });
+    }
+}
+
+export async function archiveTaskController(
+    req: AuthenticatedRequest,
+    res: Response
+) {
+    try {
+        if (!req.user) {
+            return res.status(401).json({
+                status: "error",
+                message: "Authentication required",
+            });
+        }
+
+        const taskId = req.params.taskId;
+
+        if (typeof taskId !== "string") {
+            return res.status(400).json({
+                status: "error",
+                message: "Invalid task ID",
+            });
+        }
+
+        const task = await archiveTask(
+            taskId,
+            req.user.userId
+        );
+
+        return res.status(200).json({
+            status: "success",
+            message: "Task archived successfully",
+            task,
+        });
+    } catch (error) {
+        if (error instanceof Error) {
+            if (error.message === "Task not found") {
+                return res.status(404).json({
+                    status: "error",
+                    message: error.message,
+                });
+            }
+
+            if (
+                error.message ===
+                    "You are not a member of this organization" ||
+                error.message.includes(
+                    "permission to archive"
+                )
+            ) {
+                return res.status(403).json({
+                    status: "error",
+                    message: error.message,
+                });
+            }
+
+            if (
+                error.message ===
+                "Task is already archived"
+            ) {
+                return res.status(400).json({
+                    status: "error",
+                    message: error.message,
+                });
+            }
+        }
+
+        console.error(error);
+
+        return res.status(500).json({
+            status: "error",
+            message: "Failed to archive task",
+        });
+    }
+}
+
+export async function restoreTaskController(
+    req: AuthenticatedRequest,
+    res: Response
+) {
+    try {
+        if (!req.user) {
+            return res.status(401).json({
+                status: "error",
+                message: "Authentication required",
+            });
+        }
+
+        const taskId = req.params.taskId;
+
+        if (typeof taskId !== "string") {
+            return res.status(400).json({
+                status: "error",
+                message: "Invalid task ID",
+            });
+        }
+
+        const task = await restoreTask(
+            taskId,
+            req.user.userId
+        );
+
+        return res.status(200).json({
+            status: "success",
+            message: "Task restored successfully",
+            task,
+        });
+    } catch (error) {
+        if (error instanceof Error) {
+            if (error.message === "Task not found") {
+                return res.status(404).json({
+                    status: "error",
+                    message: error.message,
+                });
+            }
+
+            if (
+                error.message ===
+                    "You are not a member of this organization" ||
+                error.message.includes(
+                    "permission to restore"
+                )
+            ) {
+                return res.status(403).json({
+                    status: "error",
+                    message: error.message,
+                });
+            }
+
+            if (
+                error.message ===
+                "Task is not archived"
+            ) {
+                return res.status(400).json({
+                    status: "error",
+                    message: error.message,
+                });
+            }
+        }
+
+        console.error(error);
+
+        return res.status(500).json({
+            status: "error",
+            message: "Failed to restore task",
+        });
+    }
+}
+
+export async function getArchivedProjectTasksController(
+    req: AuthenticatedRequest,
+    res: Response
+) {
+    try {
+        if (!req.user) {
+            return res.status(401).json({
+                status: "error",
+                message: "Authentication required",
+            });
+        }
+
+        const projectId = req.params.projectId;
+
+        if (typeof projectId !== "string") {
+            return res.status(400).json({
+                status: "error",
+                message: "Invalid project ID",
+            });
+        }
+
+        const tasks =
+            await getArchivedProjectTasks(
+                projectId,
+                req.user.userId
+            );
+
+        return res.status(200).json({
+            status: "success",
+            tasks,
+        });
+    } catch (error) {
+        if (error instanceof Error) {
+            if (
+                error.message === "Project not found"
+            ) {
+                return res.status(404).json({
+                    status: "error",
+                    message: error.message,
+                });
+            }
+
+            if (
+                error.message.includes(
+                    "permission to view archived"
+                ) ||
+                error.message ===
+                    "You are not a member of this organization"
+            ) {
+                return res.status(403).json({
+                    status: "error",
+                    message: error.message,
+                });
+            }
+        }
+
+        console.error(error);
+
+        return res.status(500).json({
+            status: "error",
+            message: "Failed to retrieve archived tasks",
         });
     }
 }
