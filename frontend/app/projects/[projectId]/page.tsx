@@ -10,6 +10,7 @@ import {
     getOrganization,
     getTaskActivities,
     updateProject, 
+    updateTask,
     type Project,
     type Task,
     type TaskActivity,
@@ -28,7 +29,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, } from "react";
 import { useRouter } from "next/navigation";
 
 function getStatusIcon(status: string) {
@@ -110,6 +111,9 @@ export default function ProjectDetailsPage() {
         useState<"tasks" | "board" | "activity">(
             "tasks"
         );
+    const [updatingTaskId, setUpdatingTaskId] = useState<string | null>(null);
+    const [openTaskMenuId, setOpenTaskMenuId] = useState<string | null>(null);
+    const [taskMenuPlacement, setTaskMenuPlacement] = useState<"top" | "bottom">("bottom");
 
     const [search, setSearch] = useState("");
     const [filtersOpen, setFiltersOpen] = useState(false);
@@ -326,6 +330,49 @@ export default function ProjectDetailsPage() {
             );
         } finally {
             setSavingProject(false);
+        }
+    }
+
+    async function handleTaskStatusChange(
+        taskId: string,
+        status: string
+    ) {
+        const token = getToken();
+
+        if (!token) {
+            setError("Authentication required.");
+            return;
+        }
+
+        setUpdatingTaskId(taskId);
+
+        try {
+            const updatedTask = await updateTask(
+                taskId,
+                token,
+                {
+                    status,
+                }
+            );
+
+            setTasks((currentTasks) =>
+                currentTasks.map((task) =>
+                    task.id === taskId
+                        ? {
+                            ...task,
+                            ...updatedTask,
+                        }
+                        : task
+                )
+            );
+        } catch (error) {
+            setTasksError(
+                error instanceof Error
+                    ? error.message
+                    : "Failed to update task status."
+            );
+        } finally {
+            setUpdatingTaskId(null);
         }
     }
 
@@ -942,7 +989,7 @@ export default function ProjectDetailsPage() {
                                     )}
 
                                     {!tasksLoading && !tasksError && filteredTasks.length > 0 && (
-                                        <div className="mt-4 overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)]">
+                                        <div className="mt-4 overflow-visible rounded-xl border border-[var(--border)] bg-[var(--surface)]">
                                             <div className="hidden border-b border-[var(--border)] px-5 py-3 text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)] md:grid md:grid-cols-[minmax(0,2fr)_150px_110px_100px_40px] md:gap-4">
                                                 <div>Task</div>
                                                 <div>Status</div>
@@ -953,16 +1000,20 @@ export default function ProjectDetailsPage() {
 
                                             <div className="divide-y divide-[var(--border)]">
                                                 {filteredTasks.map((task) => (
-                                                    <button
+                                                    <div
                                                         key={task.id}
-                                                        type="button"
-                                                        onClick={() => router.push(
-                                                            `/projects/${projectId}/tasks/${task.id}`
-                                                        )}
-                                                        className="grid w-full gap-4 px-5 py-4 text-left transition hover:bg-[var(--surface-subtle)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--primary)] md:grid-cols-[minmax(0,2fr)_150px_110px_100px_40px] md:items-center"
+                                                        className="relative grid w-full gap-4 px-5 py-4 transition hover:bg-[var(--surface-subtle)] md:grid-cols-[minmax(0,2fr)_150px_110px_100px_40px] md:items-center"
                                                     >
-                                                        <div className="min-w-0">
-                                                            <p className="truncate text-sm font-semibold">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() =>
+                                                                router.push(
+                                                                    `/projects/${projectId}/tasks/${task.id}`
+                                                                )
+                                                            }
+                                                            className="min-w-0 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--accent)]"
+                                                        >
+                                                            <p className="truncate text-sm font-semibold text-[var(--text-primary)]">
                                                                 {task.title}
                                                             </p>
 
@@ -970,9 +1021,17 @@ export default function ProjectDetailsPage() {
                                                                 {task.description ??
                                                                     `Part of ${project?.name ?? "this project"}`}
                                                             </p>
-                                                        </div>
+                                                        </button>
 
-                                                        <div className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() =>
+                                                                router.push(
+                                                                    `/projects/${projectId}/tasks/${task.id}`
+                                                                )
+                                                            }
+                                                            className="flex items-center gap-2 text-left text-sm text-[var(--text-secondary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] md:text-left"
+                                                        >
                                                             {getStatusIcon(
                                                                 task.status === "TODO"
                                                                     ? "To Do"
@@ -992,17 +1051,17 @@ export default function ProjectDetailsPage() {
                                                                     ? "Done"
                                                                     : task.status}
                                                             </span>
-                                                        </div>
+                                                        </button>
 
                                                         <div>
                                                             <span
                                                                 className={`inline-flex rounded-md px-2 py-1 text-xs font-medium ${
-                                                                    task.priority === "HIGH"
+                                                                    task.priority === "URGENT"
+                                                                        ? "bg-red-100 text-red-700"
+                                                                        : task.priority === "HIGH"
                                                                         ? "bg-red-50 text-red-600"
                                                                         : task.priority === "MEDIUM"
                                                                         ? "bg-amber-50 text-amber-600"
-                                                                        : task.priority === "URGENT"
-                                                                        ? "bg-red-100 text-red-700"
                                                                         : "bg-gray-100 text-gray-600"
                                                                 }`}
                                                             >
@@ -1011,17 +1070,131 @@ export default function ProjectDetailsPage() {
                                                         </div>
 
                                                         <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--surface-subtle)] text-xs font-semibold text-[var(--primary)]">
-                                                            {task.assigneeId
-                                                                ? task.assignee?.name
+                                                            {task.assignee?.name
+                                                                ? task.assignee.name
                                                                     .slice(0, 2)
                                                                     .toUpperCase()
                                                                 : "—"}
                                                         </div>
 
-                                                        <div className="hidden text-[var(--text-muted)] md:block">
-                                                            <MoreHorizontal size={18} />
+                                                        <div className="relative flex justify-end">
+                                                            <button
+                                                                type="button"
+                                                                onClick={(event) => {
+                                                                    event.stopPropagation();
+
+                                                                    if (openTaskMenuId === task.id) {
+                                                                        setOpenTaskMenuId(null);
+                                                                        return;
+                                                                    }
+
+                                                                    const buttonRect =
+                                                                        event.currentTarget.getBoundingClientRect();
+
+                                                                    const menuHeight = 220;
+                                                                    const spaceBelow =
+                                                                        window.innerHeight - buttonRect.bottom;
+
+                                                                    setTaskMenuPlacement(
+                                                                        spaceBelow < menuHeight
+                                                                            ? "top"
+                                                                            : "bottom"
+                                                                    );
+
+                                                                    setOpenTaskMenuId(task.id);
+                                                                }}
+                                                                className="rounded-lg p-2 text-[var(--text-muted)] transition hover:bg-[var(--surface-subtle)] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+                                                                aria-label={`Actions for ${task.title}`}
+                                                                aria-expanded={
+                                                                    openTaskMenuId === task.id
+                                                                }
+                                                            >
+                                                                <MoreHorizontal size={18} />
+                                                            </button>
+
+                                                            {openTaskMenuId === task.id && (
+                                                                <div
+                                                                    className={`absolute right-0 z-30 w-44 overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface)] py-1 shadow-lg ${
+                                                                        taskMenuPlacement === "top"
+                                                                            ? "bottom-11"
+                                                                            : "top-11"
+                                                                    }`}
+                                                                >
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => {
+                                                                            setOpenTaskMenuId(null);
+
+                                                                            router.push(
+                                                                                `/projects/${projectId}/tasks/${task.id}`
+                                                                            );
+                                                                        }}
+                                                                        className="flex w-full items-center px-3 py-2.5 text-left text-sm text-[var(--text-primary)] transition hover:bg-[var(--surface-subtle)]"
+                                                                    >
+                                                                        Open
+                                                                    </button>
+
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => {
+                                                                            setOpenTaskMenuId(null);
+
+                                                                            router.push(
+                                                                                `/projects/${projectId}/tasks/${task.id}`
+                                                                            );
+                                                                        }}
+                                                                        className="flex w-full items-center px-3 py-2.5 text-left text-sm text-[var(--text-primary)] transition hover:bg-[var(--surface-subtle)]"
+                                                                    >
+                                                                        Edit
+                                                                    </button>
+
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => {
+                                                                            setOpenTaskMenuId(null);
+
+                                                                            router.push(
+                                                                                `/projects/${projectId}/tasks/${task.id}`
+                                                                            );
+                                                                        }}
+                                                                        className="flex w-full items-center px-3 py-2.5 text-left text-sm text-[var(--text-primary)] transition hover:bg-[var(--surface-subtle)]"
+                                                                    >
+                                                                        Change status
+                                                                    </button>
+
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => {
+                                                                            setOpenTaskMenuId(null);
+
+                                                                            router.push(
+                                                                                `/projects/${projectId}/tasks/${task.id}`
+                                                                            );
+                                                                        }}
+                                                                        className="flex w-full items-center px-3 py-2.5 text-left text-sm text-[var(--text-primary)] transition hover:bg-[var(--surface-subtle)]"
+                                                                    >
+                                                                        Assign
+                                                                    </button>
+
+                                                                    {canManageTasks && (
+                                                                        <>
+                                                                            <div className="my-1 border-t border-[var(--border)]" />
+
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => {
+                                                                                    setOpenTaskMenuId(null);
+                                                                                }}
+                                                                                className="flex w-full items-center px-3 py-2.5 text-left text-sm text-red-600 transition hover:bg-red-50"
+                                                                            >
+                                                                                Delete
+                                                                            </button>
+                                                                        </>
+                                                                    )}
+                                                                </div>
+                                                            )}
                                                         </div>
-                                                    </button>
+                                                    </div>
                                                 ))}
                                             </div>
                                         </div>
@@ -1103,49 +1276,41 @@ export default function ProjectDetailsPage() {
                                                             </p>
                                                         </div>
                                                     ) : (
-                                                        columnTasks.map(
-                                                            (task) => (
+                                                        columnTasks.map((task) => (
+                                                            <div
+                                                                key={task.id}
+                                                                className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4 transition hover:border-[var(--primary)]"
+                                                            >
                                                                 <button
-                                                                    key={
-                                                                        task.id
-                                                                    }
                                                                     type="button"
                                                                     onClick={() =>
                                                                         router.push(
                                                                             `/projects/${projectId}/tasks/${task.id}`
                                                                         )
                                                                     }
-                                                                    className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4 text-left transition hover:border-[var(--primary)] hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
+                                                                    className="w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
                                                                 >
                                                                     <div className="flex items-start justify-between gap-3">
                                                                         <p className="min-w-0 text-sm font-semibold text-[var(--text-primary)]">
-                                                                            {
-                                                                                task.title
-                                                                            }
+                                                                            {task.title}
                                                                         </p>
 
                                                                         <span
                                                                             className={`shrink-0 rounded-md px-2 py-1 text-[11px] font-medium ${
-                                                                                task.priority ===
-                                                                                "URGENT"
+                                                                                task.priority === "URGENT"
                                                                                     ? "bg-red-100 text-red-700"
-                                                                                    : task.priority ===
-                                                                                    "HIGH"
+                                                                                    : task.priority === "HIGH"
                                                                                     ? "bg-red-50 text-red-600"
-                                                                                    : task.priority ===
-                                                                                    "MEDIUM"
+                                                                                    : task.priority === "MEDIUM"
                                                                                     ? "bg-amber-50 text-amber-600"
                                                                                     : "bg-gray-100 text-gray-600"
                                                                             }`}
                                                                         >
-                                                                            {task.priority ===
-                                                                            "URGENT"
+                                                                            {task.priority === "URGENT"
                                                                                 ? "Urgent"
-                                                                                : task.priority ===
-                                                                                "HIGH"
+                                                                                : task.priority === "HIGH"
                                                                                 ? "High"
-                                                                                : task.priority ===
-                                                                                "MEDIUM"
+                                                                                : task.priority === "MEDIUM"
                                                                                 ? "Medium"
                                                                                 : "Low"}
                                                                         </span>
@@ -1153,42 +1318,74 @@ export default function ProjectDetailsPage() {
 
                                                                     {task.description && (
                                                                         <p className="mt-2 line-clamp-2 text-xs leading-5 text-[var(--text-secondary)]">
-                                                                            {
-                                                                                task.description
-                                                                            }
+                                                                            {task.description}
                                                                         </p>
                                                                     )}
+                                                                </button>
 
-                                                                    <div className="mt-4 flex items-center justify-between gap-3 border-t border-[var(--border)] pt-3">
-                                                                        <div className="flex min-w-0 items-center gap-2">
-                                                                            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--surface-subtle)] text-[10px] font-semibold text-[var(--text-secondary)]">
-                                                                                {task.assignee?.name
-                                                                                    ? task.assignee.name
-                                                                                        .slice(
-                                                                                            0,
-                                                                                            2
-                                                                                        )
-                                                                                        .toUpperCase()
-                                                                                    : "—"}
-                                                                            </div>
-
-                                                                            <span className="truncate text-xs text-[var(--text-secondary)]">
-                                                                                {task.assignee?.name ??
-                                                                                    "Unassigned"}
-                                                                            </span>
+                                                                <div className="mt-4 flex items-center justify-between gap-3 border-t border-[var(--border)] pt-3">
+                                                                    <div className="flex min-w-0 items-center gap-2">
+                                                                        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--surface-subtle)] text-[10px] font-semibold text-[var(--text-secondary)]">
+                                                                            {task.assignee?.name
+                                                                                ? task.assignee.name
+                                                                                    .slice(0, 2)
+                                                                                    .toUpperCase()
+                                                                                : "—"}
                                                                         </div>
 
-                                                                        {task.dueDate && (
-                                                                            <span className="shrink-0 text-xs text-[var(--text-muted)]">
-                                                                                {new Date(
-                                                                                    task.dueDate
-                                                                                ).toLocaleDateString()}
-                                                                            </span>
-                                                                        )}
+                                                                        <span className="truncate text-xs text-[var(--text-secondary)]">
+                                                                            {task.assignee?.name ??
+                                                                                "Unassigned"}
+                                                                        </span>
                                                                     </div>
-                                                                </button>
-                                                            )
-                                                        )
+
+                                                                    {task.dueDate && (
+                                                                        <span className="shrink-0 text-xs text-[var(--text-muted)]">
+                                                                            {new Date(
+                                                                                task.dueDate
+                                                                            ).toLocaleDateString()}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+
+                                                                <div className="mt-3">
+                                                                    <label
+                                                                        htmlFor={`task-status-${task.id}`}
+                                                                        className="mb-1.5 block text-[11px] font-medium text-[var(--text-muted)]"
+                                                                    >
+                                                                        Status
+                                                                    </label>
+
+                                                                    <select
+                                                                        id={`task-status-${task.id}`}
+                                                                        value={task.status}
+                                                                        onChange={(event) => {
+                                                                            void handleTaskStatusChange(
+                                                                                task.id,
+                                                                                event.target.value
+                                                                            );
+                                                                        }}
+                                                                        disabled={
+                                                                            updatingTaskId === task.id
+                                                                        }
+                                                                        className="h-9 w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 text-xs text-[var(--text-primary)] outline-none transition focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--accent)]/20 disabled:cursor-not-allowed disabled:opacity-60"
+                                                                    >
+                                                                        <option value="TODO">
+                                                                            To Do
+                                                                        </option>
+                                                                        <option value="IN_PROGRESS">
+                                                                            In Progress
+                                                                        </option>
+                                                                        <option value="REVIEW">
+                                                                            Review
+                                                                        </option>
+                                                                        <option value="DONE">
+                                                                            Done
+                                                                        </option>
+                                                                    </select>
+                                                                </div>
+                                                            </div>
+                                                        ))
                                                     )}
                                                 </div>
                                             </div>
