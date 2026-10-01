@@ -9,6 +9,7 @@ import {
 import { useAuth } from "./AuthProvider";
 import {
     getOrganizations,
+    getOrganization,
     type Organization,
 } from "@/lib/api";
 import { getToken } from "@/lib/auth";
@@ -47,16 +48,49 @@ export function OrganizationProvider({
         useState<"OWNER" | "ADMIN" | "MEMBER" | null>(null);
 
     const [loading, setLoading] = useState(true);
+    const {user, loading: authLoading } = useAuth();
 
-    function setActiveOrganization(
+    async function setActiveOrganization(
         organization: Organization
     ) {
+        const token = getToken();
+
         setActiveOrganizationState(organization);
 
         localStorage.setItem(
             ACTIVE_ORGANIZATION_KEY,
             organization.id
         );
+
+        if (!token || !user) {
+            setActiveOrganizationRole(null);
+            return;
+        }
+
+        try {
+            const organizationDetails =
+                await getOrganization(
+                    organization.id,
+                    token
+                );
+
+            const currentMember =
+                organizationDetails.members.find(
+                    (member) =>
+                        member.userId === user.id
+                );
+
+            setActiveOrganizationRole(
+                currentMember?.role ?? null
+            );
+        } catch (error) {
+            console.error(
+                "Failed to load organization role:",
+                error
+            );
+
+            setActiveOrganizationRole(null);
+        }
     }
 
     async function refreshOrganizations() {
@@ -65,6 +99,7 @@ export function OrganizationProvider({
         if (!token) {
             setOrganizations([]);
             setActiveOrganizationState(null);
+            setActiveOrganizationRole(null);
             return;
         }
 
@@ -74,9 +109,12 @@ export function OrganizationProvider({
 
         if (result.length === 0) {
             setActiveOrganizationState(null);
+            setActiveOrganizationRole(null);
+
             localStorage.removeItem(
                 ACTIVE_ORGANIZATION_KEY
             );
+
             return;
         }
 
@@ -85,17 +123,43 @@ export function OrganizationProvider({
                 ACTIVE_ORGANIZATION_KEY
             );
 
-        const savedOrganization = result.find(
-            (organization) =>
-                organization.id === savedOrganizationId
-        );
+        const selectedOrganization =
+            result.find(
+                (organization) =>
+                    organization.id === savedOrganizationId
+            ) ?? result[0];
 
         setActiveOrganizationState(
-            savedOrganization ?? result[0]
+            selectedOrganization
+        );
+
+        if (!user) {
+            setActiveOrganizationRole(null);
+            return;
+        }
+
+        const organizationDetails =
+            await getOrganization(
+                selectedOrganization.id,
+                token
+            );
+
+        const currentMember =
+            organizationDetails.members.find(
+                (member) =>
+                    member.userId === user.id
+            );
+
+        setActiveOrganizationRole(
+            currentMember?.role ?? null
         );
     }
 
     useEffect(() => {
+        if (authLoading) {
+            return;
+        }
+
         async function loadOrganizations() {
             try {
                 await refreshOrganizations();
@@ -113,7 +177,7 @@ export function OrganizationProvider({
         }
 
         void loadOrganizations();
-    }, []);
+    }, [authLoading]);
 
     return (
         <OrganizationContext.Provider

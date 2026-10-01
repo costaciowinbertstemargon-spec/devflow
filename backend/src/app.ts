@@ -1,7 +1,6 @@
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
-import rateLimit from "express-rate-limit";
 import { prisma } from "./config/database.js";
 import authRoutes from "./routes/auth.routes.js";
 import organizationRoutes from "./routes/organization.routes.js";
@@ -16,17 +15,6 @@ import { swaggerDocument } from "./config/swagger.js";
 import { env } from "./config/env.js";
 
 const app = express();
-
-const authLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    limit: process.env.NODE_ENV === "test" ? 1000 : 10,
-    standardHeaders: "draft-8",
-    legacyHeaders: false,
-    message: {
-        status: "error",
-        message: "Too many authentication attempts. Please try again later.",
-    },
-});
 
 app.use(
     cors({
@@ -43,7 +31,7 @@ app.use(
     swaggerUi.setup(swaggerDocument)
 );
 
-app.use("/api/auth", authLimiter, authRoutes);
+app.use("/api/auth", authRoutes);
 
 app.use("/api/organizations", organizationRoutes);
 

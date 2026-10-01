@@ -376,6 +376,7 @@ export async function getProjectTasks(
     return prisma.task.findMany({
         where: {
             projectId,
+            archivedAt: null,
 
             ...(filters.status !== undefined && {
                 status: filters.status,

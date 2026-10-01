@@ -39,9 +39,25 @@ export function AuthProvider({
         try {
             const currentUser = await getMe(token);
             setUser(currentUser);
-        } catch {
-            removeToken();
-            setUser(null);
+        } catch (error) {
+            const status =
+                error instanceof Error
+                    ? (error as Error & {
+                        status?: number;
+                    }).status
+                    : undefined;
+
+            console.error(
+                "Failed to refresh authenticated user:",
+                error
+            );
+
+            // Only remove the token when the server
+            // confirms that the token is invalid.
+            if (status === 401) {
+                removeToken();
+                setUser(null);
+            }
         }
     }
 
@@ -52,15 +68,58 @@ export function AuthProvider({
     }
 
     useEffect(() => {
+        let mounted = true;
+
         async function loadUser() {
+            const token = getToken();
+
+            if (!token) {
+                if (mounted) {
+                    setUser(null);
+                    setLoading(false);
+                }
+
+                return;
+            }
+
             try {
-                await refreshUser();
+                const currentUser = await getMe(token);
+
+                if (mounted) {
+                    setUser(currentUser);
+                }
+            } catch (error) {
+                const status =
+                    error instanceof Error
+                        ? (error as Error & { status?: number }).status
+                        : undefined;
+
+                console.error(
+                    "Authentication check failed:",
+                    error
+                );
+
+                // Only remove the token when authentication is
+                // actually rejected.
+                if (status === 401) {
+                    removeToken();
+
+                    if (mounted) {
+                        setUser(null);
+                    }
+                }
             } finally {
-                setLoading(false);
+                if (mounted) {
+                    setLoading(false);
+                }
             }
         }
 
         void loadUser();
+
+        return () => {
+            mounted = false;
+        };
     }, []);
 
     return (

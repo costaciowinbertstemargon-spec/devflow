@@ -240,9 +240,14 @@ export async function getMe(
     const data = (await response.json()) as MeResponse;
 
     if (!response.ok) {
-        throw new Error(
+        const error = new Error(
             data.message || "Failed to retrieve current user"
         );
+
+        (error as Error & { status?: number }).status =
+            response.status;
+
+        throw error;
     }
 
     return data.user;
@@ -608,7 +613,8 @@ export async function createTask(
     title: string,
     description?: string,
     priority?: string,
-    dueDate?: string
+    dueDate?: string,
+    assigneeId?: string
 ): Promise<Task> {
     const response = await fetch(
         `${API_URL}/projects/${projectId}/tasks`,
@@ -633,6 +639,11 @@ export async function createTask(
                 ...(dueDate
                     ? {
                           dueDate,
+                      }
+                    : {}),
+                ...(assigneeId
+                    ? {
+                          assigneeId,
                       }
                     : {}),
             }),

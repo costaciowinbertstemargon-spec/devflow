@@ -14,10 +14,10 @@ import {
     getTaskActivities,
     updateProject, 
     updateTask,
-    
     type Project,
     type Task,
     type TaskActivity,
+    type OrganizationMember,
 } from "@/lib/api";
 import { getToken } from "@/lib/auth";
 import {
@@ -118,6 +118,8 @@ export default function ProjectDetailsPage() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
 
+    const [organizationMembers, setOrganizationMembers] = useState<OrganizationMember[]>([]);
+
     const [tasks, setTasks] = useState<Task[]>([]);
     const [tasksLoading, setTasksLoading] = useState(true);
     const [tasksError, setTasksError] = useState("");
@@ -140,6 +142,7 @@ export default function ProjectDetailsPage() {
     const [taskDescription, setTaskDescription] = useState("");
     const [taskPriority, setTaskPriority] = useState("MEDIUM");
     const [taskDueDate, setTaskDueDate] = useState("");
+    const [taskAssigneeId, setTaskAssigneeId] = useState("");
     const [savingTask, setSavingTask] = useState(false);
     const [taskFormError, setTaskFormError] = useState("");
 
@@ -233,10 +236,12 @@ export default function ProjectDetailsPage() {
                     token
                 );
 
-                const membership = organization.members.find(
-                    (member) => member.userId === user?.id
-                );
+                setOrganizationMembers(organization.members);
 
+                const membership = organization.members.find(
+                    (member) => member.user.id === user?.id
+                );
+                
                 setCanManageTasks(
                     membership?.role === "OWNER" ||
                     membership?.role === "ADMIN"
@@ -297,7 +302,8 @@ export default function ProjectDetailsPage() {
                     ? new Date(
                         `${taskDueDate}T00:00:00`
                     ).toISOString()
-                    : undefined
+                    : undefined,
+                taskAssigneeId || undefined
             );
 
             const updatedTasks =
@@ -313,6 +319,7 @@ export default function ProjectDetailsPage() {
             setTaskDescription("");
             setTaskPriority("MEDIUM");
             setTaskDueDate("");
+            setTaskAssigneeId("");
         } catch (error) {
             setTaskFormError(
                 error instanceof Error
@@ -647,12 +654,12 @@ export default function ProjectDetailsPage() {
     return (
         <ProtectedRoute>
             <AppShell>
-                <div className="mx-auto max-w-7xl">
+                <div className="mx-auto w-full max-w-[1440px] px-4 pb-10 sm:px-6 lg:px-8">
                     {/* Back link */}
-                    <div className="mb-6">
+                    <div className="mb-5 pt-1 sm:mb-6">
                         <Link
                             href="/projects"
-                            className="inline-flex items-center gap-2 text-sm font-medium text-[var(--text-secondary)] transition hover:text-[var(--primary)]"
+                            className="inline-flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-subtle)] hover:text-[var(--primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2"
                         >
                             <ArrowLeft size={16} />
                             Back to Projects
@@ -661,7 +668,7 @@ export default function ProjectDetailsPage() {
 
                     {/* Loading */}
                     {loading && (
-                        <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)]">
+                        <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-sm">
                             <div className="p-6">
                                 <div className="h-4 w-20 animate-pulse rounded bg-[var(--surface-subtle)]" />
 
@@ -678,7 +685,7 @@ export default function ProjectDetailsPage() {
                     {!loading && error && (
                         <div
                             role="alert"
-                            className="rounded-xl border border-red-200 bg-red-50 p-6"
+                            className="rounded-2xl border border-red-200/80 bg-red-50/80 p-6 shadow-sm"
                         >
                             <h2 className="text-base font-semibold text-red-800">
                                 Unable to load project
@@ -691,14 +698,14 @@ export default function ProjectDetailsPage() {
                             <button
                                 type="button"
                                 onClick={() => window.location.reload()}
-                                className="mt-3 inline-flex items-center rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-sm font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--surface-subtle)]"
+                                className="mt-3 inline-flex items-center rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-sm px-4 py-2.5 text-sm font-semibold text-[var(--text-secondary)] transition-colors duration-150 hover:bg-[var(--surface-subtle)]"
                             >
                                 Try Again
                             </button>
 
                             <Link
                                 href="/projects"
-                                className="mt-4 inline-flex items-center rounded-lg bg-[var(--primary)] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--primary-hover)]"
+                                className="mt-4 inline-flex items-center rounded-xl bg-[var(--primary)] px-4 py-2.5 shadow-sm text-sm font-semibold text-white transition-colors duration-150 hover:bg-[var(--primary-hover)]"
                             >
                                 Back to Projects
                             </Link>
@@ -709,8 +716,8 @@ export default function ProjectDetailsPage() {
                     {!loading && !error && project && (
                         <>
                             {/* Project header */}
-                            <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)]">
-                                <div className="flex flex-col gap-5 border-b border-[var(--border)] p-6 lg:flex-row lg:items-start lg:justify-between">
+                            <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-sm">
+                                <div className="flex flex-col gap-6 border-b border-[var(--border)] p-5 sm:p-6 lg:flex-row lg:items-start lg:justify-between">
                                     <div className="min-w-0">
                                         <div className="mb-3 flex items-center gap-3">
                                             <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--surface-subtle)] text-[var(--primary)]">
@@ -746,7 +753,7 @@ export default function ProjectDetailsPage() {
                                     <div className="flex items-center gap-2">
                                         <Link
                                             href={"/members"}
-                                            className="inline-flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2.5 text-sm font-medium text-[var(--text-secondary)] transition hover:bg-[var(--surface-subtle)] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2"
+                                            className="inline-flex items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-sm px-3.5 py-2.5 text-sm font-medium text-[var(--text-secondary)] transition-colors duration-150 hover:bg-[var(--surface-subtle)] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2"
                                         >
                                             <Users size={16} />
                                             Members
@@ -766,7 +773,7 @@ export default function ProjectDetailsPage() {
                                                 setProjectFormError("");
                                                 setEditProjectModalOpen(true);
                                             }}
-                                            className="rounded-lg p-2.5 text-[var(--text-secondary)] transition hover:bg-[var(--surface-subtle)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2"
+                                            className="rounded-xl p-2.5 text-[var(--text-secondary)] transition-colors duration-150 hover:bg-[var(--surface-subtle)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2"
                                             aria-label="Edit project"
                                             title="Edit project"
                                         >
@@ -776,8 +783,8 @@ export default function ProjectDetailsPage() {
                                 </div>
 
                                 {/* Project stats */}
-                                <div className="grid grid-cols-2 divide-x divide-[var(--border)] sm:grid-cols-4">
-                                    <div className="px-5 py-4">
+                                <div className="grid grid-cols-2 divide-x divide-y divide-[var(--border)] sm:grid-cols-4 sm:divide-y-0">
+                                    <div className="px-5 py-4 transition-colors hover:bg-[var(--surface-subtle)]">
                                         <p className="text-xs text-[var(--text-muted)]">
                                             Total Tasks
                                         </p>
@@ -787,7 +794,7 @@ export default function ProjectDetailsPage() {
                                         </p>
                                     </div>
 
-                                    <div className="px-5 py-4">
+                                    <div className="px-5 py-4 transition-colors hover:bg-[var(--surface-subtle)]">
                                         <p className="text-xs text-[var(--text-muted)]">
                                             To Do
                                         </p>
@@ -797,7 +804,7 @@ export default function ProjectDetailsPage() {
                                         </p>
                                     </div>
 
-                                    <div className="px-5 py-4">
+                                    <div className="px-5 py-4 transition-colors hover:bg-[var(--surface-subtle)]">
                                         <p className="text-xs text-[var(--text-muted)]">
                                             In Progress
                                         </p>
@@ -807,7 +814,7 @@ export default function ProjectDetailsPage() {
                                         </p>
                                     </div>
 
-                                    <div className="px-5 py-4">
+                                    <div className="px-5 py-4 transition-colors hover:bg-[var(--surface-subtle)]">
                                         <p className="text-xs text-[var(--text-muted)]">
                                             Completed
                                         </p>
@@ -821,7 +828,7 @@ export default function ProjectDetailsPage() {
 
                             {/* Workspace toolbar */}
                             <div className="mt-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                                <div className="flex w-full items-center gap-2 sm:w-auto">
+                                <div className="flex w-full items-center gap-1 overflow-x-auto rounded-xl border border-[var(--border)] bg-[var(--surface-subtle)] p-1 sm:w-auto">
                                     <button
                                         type="button"
                                         onClick={() =>
@@ -829,26 +836,28 @@ export default function ProjectDetailsPage() {
                                         }
                                         className={
                                             activeView === "tasks"
-                                                ? "rounded-lg bg-[var(--primary)] px-3.5 py-2.5 text-sm font-semibold text-white"
-                                                : "rounded-lg px-3.5 py-2.5 text-sm font-medium text-[var(--text-secondary)] transition hover:bg-[var(--surface-subtle)]"
+                                                ? "rounded-xl bg-[var(--primary)] px-3.5 py-2.5 shadow-sm text-sm font-semibold text-white"
+                                                : "rounded-xl px-3.5 py-2.5 text-sm font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-subtle)]"
                                         }
                                     >
                                         Tasks
                                     </button>
 
-                                    <button
-                                        type="button"
-                                        onClick={() =>
-                                            setActiveView("board")
-                                        }
-                                        className={
-                                            activeView === "board"
-                                                ? "rounded-lg bg-[var(--primary)] px-3.5 py-2.5 text-sm font-semibold text-white"
-                                                : "rounded-lg px-3.5 py-2.5 text-sm font-medium text-[var(--text-secondary)] transition hover:bg-[var(--surface-subtle)]"
-                                        }
-                                    >
-                                        Board
-                                    </button>
+                                    {canManageTasks && (
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                setActiveView("board")
+                                            }
+                                            className={
+                                                activeView === "board"
+                                                    ? "rounded-xl bg-[var(--primary)] px-3.5 py-2.5 shadow-sm text-sm font-semibold text-white"
+                                                    : "rounded-xl px-3.5 py-2.5 text-sm font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-subtle)]"
+                                            }
+                                        >
+                                            Board
+                                        </button>                                        
+                                    )}
 
                                     <button
                                         type="button"
@@ -857,27 +866,29 @@ export default function ProjectDetailsPage() {
                                         }
                                         className={
                                             activeView === "activity"
-                                                ? "rounded-lg bg-[var(--primary)] px-3.5 py-2.5 text-sm font-semibold text-white"
-                                                : "rounded-lg px-3.5 py-2.5 text-sm font-medium text-[var(--text-secondary)] transition hover:bg-[var(--surface-subtle)]"
+                                                ? "rounded-xl bg-[var(--primary)] px-3.5 py-2.5 shadow-sm text-sm font-semibold text-white"
+                                                : "rounded-xl px-3.5 py-2.5 text-sm font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-subtle)]"
                                         }
                                     >
                                         Activity
                                     </button>
 
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setActiveView("archived");
-                                            void loadArchivedTasks();
-                                        }}
-                                        className={
-                                            activeView === "archived"
-                                                ? "rounded-lg bg-[var(--primary)] px-3.5 py-2.5 text-sm font-semibold text-white"
-                                                : "rounded-lg px-3.5 py-2.5 text-sm font-medium text-[var(--text-secondary)] transition hover:bg-[var(--surface-subtle)]"
-                                        }
-                                    >
-                                        Archived
-                                    </button>
+                                    {canManageTasks && (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setActiveView("archived");
+                                                void loadArchivedTasks();
+                                            }}
+                                            className={
+                                                activeView === "archived"
+                                                    ? "rounded-xl bg-[var(--primary)] px-3.5 py-2.5 shadow-sm text-sm font-semibold text-white"
+                                                    : "rounded-xl px-3.5 py-2.5 text-sm font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-subtle)]"
+                                            }
+                                        >
+                                            Archived
+                                        </button>
+                                    )}
 
                                 </div>
 
@@ -890,9 +901,10 @@ export default function ProjectDetailsPage() {
                                             setTaskDescription("");
                                             setTaskPriority("MEDIUM");
                                             setTaskDueDate("");
+                                            setTaskAssigneeId("");
                                             setCreateTaskModalOpen(true);
                                         }}
-                                        className="inline-flex items-center justify-center gap-2 rounded-lg bg-[var(--primary)] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--primary-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2"
+                                        className="inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--primary)] px-4 py-2.5 shadow-sm text-sm font-semibold text-white transition-colors duration-150 hover:bg-[var(--primary-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2"
                                     >
                                         <Plus size={17} />
                                         Add Task
@@ -917,7 +929,7 @@ export default function ProjectDetailsPage() {
                                                     setSearch(event.target.value)
                                                 }
                                                 placeholder="Search tasks..."
-                                                className="h-11 w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] pl-10 pr-4 text-sm outline-none transition placeholder:text-[var(--text-muted)] focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--accent)]/20 focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
+                                                className="h-11 w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-sm pl-10 pr-4 text-sm outline-none transition placeholder:text-[var(--text-muted)] focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--accent)]/20 focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
                                             />
                                         </div>
 
@@ -942,7 +954,7 @@ export default function ProjectDetailsPage() {
                                     </div>
 
                                     {filtersOpen && (
-                                        <div className="mt-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-sm">
+                                        <div className="mt-3 rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-sm p-4 shadow-sm">
                                             <div className="grid gap-4 md:grid-cols-3">
                                                 <div>
                                                     <label
@@ -960,7 +972,7 @@ export default function ProjectDetailsPage() {
                                                                 event.target.value as typeof statusFilter
                                                             )
                                                         }
-                                                        className="h-10 w-full rounded-lg border border-[var(--border)] bg-white px-3 text-sm outline-none focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--accent)]/20"
+                                                        className="h-10 w-full rounded-xl border border-[var(--border)] bg-white px-3 text-sm outline-none focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--accent)]/20"
                                                     >
                                                         <option value="ALL">
                                                             All statuses
@@ -1000,7 +1012,7 @@ export default function ProjectDetailsPage() {
                                                                 event.target.value as typeof priorityFilter
                                                             )
                                                         }
-                                                        className="h-10 w-full rounded-lg border border-[var(--border)] bg-white px-3 text-sm outline-none focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--accent)]/20"
+                                                        className="h-10 w-full rounded-xl border border-[var(--border)] bg-white px-3 text-sm outline-none focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--accent)]/20"
                                                     >
                                                         <option value="ALL">
                                                             All priorities
@@ -1040,7 +1052,7 @@ export default function ProjectDetailsPage() {
                                                                 event.target.value as typeof sortBy
                                                             )
                                                         }
-                                                        className="h-10 w-full rounded-lg border border-[var(--border)] bg-white px-3 text-sm outline-none focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--accent)]/20"
+                                                        className="h-10 w-full rounded-xl border border-[var(--border)] bg-white px-3 text-sm outline-none focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--accent)]/20"
                                                     >
                                                         <option value="updated-desc">
                                                             Recently updated
@@ -1083,7 +1095,7 @@ export default function ProjectDetailsPage() {
 
                                     {/* Task table */}
                                     {tasksLoading && (
-                                        <div className="mt-4 overflow-x-auto rounded-xl border border-[var(--border)] bg-[var(--surface)]">
+                                        <div className="mt-4 overflow-x-auto rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-sm">
                                             <div className="divide-y divide-[var(--border)]">
                                                 {[1, 2, 3].map((item) => (
                                                     <div
@@ -1108,14 +1120,14 @@ export default function ProjectDetailsPage() {
                                     {!tasksLoading && tasksError && (
                                         <div
                                             role="alert"
-                                            className="mt-4 rounded-xl border border-red-200 bg-red-50 p-5 text-sm text-red-700"
+                                            className="mt-4 rounded-2xl border border-red-200/80 bg-red-50/80 p-5 shadow-sm text-sm text-red-700"
                                         >
                                             <p>{tasksError}</p>
 
                                             <button
                                                 type="button"
                                                 onClick={() => window.location.reload()}
-                                                className="mt-3 inline-flex items-center rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-sm font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--surface-subtle)]"
+                                                className="mt-3 inline-flex items-center rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-sm px-4 py-2.5 text-sm font-semibold text-[var(--text-secondary)] transition-colors duration-150 hover:bg-[var(--surface-subtle)]"
                                             >
                                                 Try Again
                                             </button>
@@ -1123,7 +1135,7 @@ export default function ProjectDetailsPage() {
                                     )}
 
                                     {!tasksLoading && !tasksError && filteredTasks.length === 0 && (
-                                        <div className="mt-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-10 text-center">
+                                        <div className="mt-4 rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-sm p-10 text-center">
                                             <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-[var(--surface-subtle)] text-[var(--text-muted)]">
                                                 <CheckCircle2 size={24} />
                                             </div>
@@ -1151,7 +1163,7 @@ export default function ProjectDetailsPage() {
                                                         setTaskDueDate("");
                                                         setCreateTaskModalOpen(true);
                                                     }}
-                                                    className="mt-5 inline-flex items-center justify-center rounded-lg bg-[var(--primary)] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--primary-hover)]"
+                                                    className="mt-5 inline-flex items-center justify-center rounded-xl bg-[var(--primary)] px-4 py-2.5 shadow-sm text-sm font-semibold text-white transition-colors duration-150 hover:bg-[var(--primary-hover)]"
                                                 >
                                                     Add your first task
                                                 </button>
@@ -1163,7 +1175,7 @@ export default function ProjectDetailsPage() {
                                                         setStatusFilter("ALL");
                                                         setPriorityFilter("ALL");
                                                     }}
-                                                    className="mt-5 inline-flex items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-sm font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--surface-subtle)]"
+                                                    className="mt-5 inline-flex items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-sm px-4 py-2.5 text-sm font-semibold text-[var(--text-secondary)] transition-colors duration-150 hover:bg-[var(--surface-subtle)]"
                                                 >
                                                     Clear search and filters
                                                 </button>
@@ -1172,7 +1184,7 @@ export default function ProjectDetailsPage() {
                                     )}
 
                                     {!tasksLoading && !tasksError && filteredTasks.length > 0 && (
-                                        <div className="mt-4 overflow-visible rounded-xl border border-[var(--border)] bg-[var(--surface)]">
+                                        <div className="mt-4 overflow-visible rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-sm">
                                             <div className="hidden border-b border-[var(--border)] px-5 py-3 text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)] md:grid md:grid-cols-[minmax(0,2fr)_150px_110px_100px_40px] md:gap-4">
                                                 <div>Task</div>
                                                 <div>Status</div>
@@ -1185,7 +1197,7 @@ export default function ProjectDetailsPage() {
                                                 {filteredTasks.map((task) => (
                                                     <div
                                                         key={task.id}
-                                                        className="relative grid w-full gap-4 px-5 py-4 transition hover:bg-[var(--surface-subtle)] md:grid-cols-[minmax(0,2fr)_150px_110px_100px_40px] md:items-center"
+                                                        className="relative grid w-full gap-4 px-5 py-4 transition-colors duration-150 hover:bg-[var(--surface-subtle)] md:grid-cols-[minmax(0,2fr)_150px_110px_100px_40px] md:items-center"
                                                     >
                                                         <button
                                                             type="button"
@@ -1247,55 +1259,57 @@ export default function ProjectDetailsPage() {
                                                         </div>
 
                                                         <div className="relative flex justify-end">
-                                                            <button
-                                                                type="button"
-                                                                onClick={(event) => {
-                                                                    event.stopPropagation();
+                                                            {canManageTasks && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={(event) => {
+                                                                        event.stopPropagation();
 
-                                                                    if (openTaskMenuId === task.id) {
-                                                                        setOpenTaskMenuId(null);
-                                                                        return;
+                                                                        if (openTaskMenuId === task.id) {
+                                                                            setOpenTaskMenuId(null);
+                                                                            return;
+                                                                        }
+
+                                                                        const buttonRect =
+                                                                            event.currentTarget.getBoundingClientRect();
+
+                                                                        const menuHeight = 220;
+                                                                        const menuWidth = 176;
+                                                                        const spaceBelow =
+                                                                            window.innerHeight -
+                                                                            buttonRect.bottom;
+
+                                                                        const placement =
+                                                                            spaceBelow < menuHeight
+                                                                                ? "top"
+                                                                                : "bottom";
+
+                                                                        setTaskMenuPlacement(placement);
+
+                                                                        setTaskMenuPosition({
+                                                                            top:
+                                                                                placement === "top"
+                                                                                    ? buttonRect.top - menuHeight
+                                                                                    : buttonRect.bottom + 4,
+                                                                            left:
+                                                                                buttonRect.right - menuWidth,
+                                                                        });
+
+                                                                        setOpenTaskMenuId(task.id);
+                                                                    }}
+                                                                    className="rounded-xl p-2 text-[var(--text-muted)] transition-colors duration-150 hover:bg-[var(--surface-subtle)] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+                                                                    aria-label={`Actions for ${task.title}`}
+                                                                    aria-expanded={
+                                                                        openTaskMenuId === task.id
                                                                     }
-
-                                                                    const buttonRect =
-                                                                        event.currentTarget.getBoundingClientRect();
-
-                                                                    const menuHeight = 220;
-                                                                    const menuWidth = 176;
-                                                                    const spaceBelow =
-                                                                        window.innerHeight -
-                                                                        buttonRect.bottom;
-
-                                                                    const placement =
-                                                                        spaceBelow < menuHeight
-                                                                            ? "top"
-                                                                            : "bottom";
-
-                                                                    setTaskMenuPlacement(placement);
-
-                                                                    setTaskMenuPosition({
-                                                                        top:
-                                                                            placement === "top"
-                                                                                ? buttonRect.top - menuHeight
-                                                                                : buttonRect.bottom + 4,
-                                                                        left:
-                                                                            buttonRect.right - menuWidth,
-                                                                    });
-
-                                                                    setOpenTaskMenuId(task.id);
-                                                                }}
-                                                                className="rounded-lg p-2 text-[var(--text-muted)] transition hover:bg-[var(--surface-subtle)] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
-                                                                aria-label={`Actions for ${task.title}`}
-                                                                aria-expanded={
-                                                                    openTaskMenuId === task.id
-                                                                }
-                                                            >
-                                                                <MoreHorizontal size={18} />
-                                                            </button>
+                                                                >
+                                                                    <MoreHorizontal size={18} />
+                                                                </button>
+                                                            )}
 
                                                             {openTaskMenuId === task.id && (
                                                                 <div
-                                                                    className={`absolute right-0 z-30 w-44 overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface)] py-1 shadow-lg ${
+                                                                    className={`absolute right-0 z-30 w-44 overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] py-1 shadow-xl ${
                                                                         taskMenuPlacement === "top"
                                                                             ? "bottom-11"
                                                                             : "top-11"
@@ -1310,7 +1324,7 @@ export default function ProjectDetailsPage() {
                                                                                 `/projects/${projectId}/tasks/${task.id}`
                                                                             );
                                                                         }}
-                                                                        className="flex w-full items-center px-3 py-2.5 text-left text-sm text-[var(--text-primary)] transition hover:bg-[var(--surface-subtle)]"
+                                                                        className="flex w-full items-center px-3 py-2.5 text-left text-sm text-[var(--text-primary)] transition-colors duration-150 hover:bg-[var(--surface-subtle)]"
                                                                     >
                                                                         Open
                                                                     </button>
@@ -1324,7 +1338,7 @@ export default function ProjectDetailsPage() {
                                                                                 `/projects/${projectId}/tasks/${task.id}`
                                                                             );
                                                                         }}
-                                                                        className="flex w-full items-center px-3 py-2.5 text-left text-sm text-[var(--text-primary)] transition hover:bg-[var(--surface-subtle)]"
+                                                                        className="flex w-full items-center px-3 py-2.5 text-left text-sm text-[var(--text-primary)] transition-colors duration-150 hover:bg-[var(--surface-subtle)]"
                                                                     >
                                                                         Edit
                                                                     </button>
@@ -1338,7 +1352,7 @@ export default function ProjectDetailsPage() {
                                                                                 `/projects/${projectId}/tasks/${task.id}`
                                                                             );
                                                                         }}
-                                                                        className="flex w-full items-center px-3 py-2.5 text-left text-sm text-[var(--text-primary)] transition hover:bg-[var(--surface-subtle)]"
+                                                                        className="flex w-full items-center px-3 py-2.5 text-left text-sm text-[var(--text-primary)] transition-colors duration-150 hover:bg-[var(--surface-subtle)]"
                                                                     >
                                                                         Change status
                                                                     </button>
@@ -1352,7 +1366,7 @@ export default function ProjectDetailsPage() {
                                                                                 `/projects/${projectId}/tasks/${task.id}`
                                                                             );
                                                                         }}
-                                                                        className="flex w-full items-center px-3 py-2.5 text-left text-sm text-[var(--text-primary)] transition hover:bg-[var(--surface-subtle)]"
+                                                                        className="flex w-full items-center px-3 py-2.5 text-left text-sm text-[var(--text-primary)] transition-colors duration-150 hover:bg-[var(--surface-subtle)]"
                                                                     >
                                                                         Assign
                                                                     </button>
@@ -1436,7 +1450,7 @@ export default function ProjectDetailsPage() {
                                         return (
                                             <div
                                                 key={column.value}
-                                                className="min-h-[420px] rounded-xl border border-[var(--border)] bg-[var(--surface-subtle)] p-3"
+                                                className="min-h-[420px] rounded-2xl border border-[var(--border)] bg-[var(--surface-subtle)] p-3 shadow-sm"
                                             >
                                                 <div className="mb-3 flex items-center justify-between px-1">
                                                     <h3 className="text-sm font-semibold text-[var(--text-primary)]">
@@ -1460,7 +1474,7 @@ export default function ProjectDetailsPage() {
                                                         columnTasks.map((task) => (
                                                             <div
                                                                 key={task.id}
-                                                                className="relative rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4 transition hover:border-[var(--primary)]"
+                                                                className="relative rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-sm p-4 transition hover:border-[var(--primary)]"
                                                             >
                                                                 <div className="flex items-start justify-between gap-3">
                                                                     <button
@@ -1506,7 +1520,7 @@ export default function ProjectDetailsPage() {
 
                                                                                 setOpenTaskMenuId(task.id);
                                                                             }}
-                                                                            className="rounded-md p-1.5 text-[var(--text-muted)] transition hover:bg-[var(--surface-subtle)] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+                                                                            className="rounded-md p-1.5 text-[var(--text-muted)] transition-colors duration-150 hover:bg-[var(--surface-subtle)] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
                                                                             aria-label={`Actions for ${task.title}`}
                                                                             aria-expanded={
                                                                                 openTaskMenuId === task.id
@@ -1517,7 +1531,7 @@ export default function ProjectDetailsPage() {
 
                                                                         {openTaskMenuId === task.id && (
                                                                             <div
-                                                                                className="fixed z-[100] w-44 overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface)] py-1 shadow-lg"
+                                                                                className="fixed z-[100] w-44 overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] py-1 shadow-xl"
                                                                                 style={{
                                                                                     top: taskMenuPosition.top,
                                                                                     left: taskMenuPosition.left,
@@ -1532,7 +1546,7 @@ export default function ProjectDetailsPage() {
                                                                                             `/projects/${projectId}/tasks/${task.id}`
                                                                                         );
                                                                                     }}
-                                                                                    className="flex w-full items-center px-3 py-2.5 text-left text-sm text-[var(--text-primary)] transition hover:bg-[var(--surface-subtle)]"
+                                                                                    className="flex w-full items-center px-3 py-2.5 text-left text-sm text-[var(--text-primary)] transition-colors duration-150 hover:bg-[var(--surface-subtle)]"
                                                                                 >
                                                                                     Open
                                                                                 </button>
@@ -1546,7 +1560,7 @@ export default function ProjectDetailsPage() {
                                                                                             `/projects/${projectId}/tasks/${task.id}`
                                                                                         );
                                                                                     }}
-                                                                                    className="flex w-full items-center px-3 py-2.5 text-left text-sm text-[var(--text-primary)] transition hover:bg-[var(--surface-subtle)]"
+                                                                                    className="flex w-full items-center px-3 py-2.5 text-left text-sm text-[var(--text-primary)] transition-colors duration-150 hover:bg-[var(--surface-subtle)]"
                                                                                 >
                                                                                     Edit
                                                                                 </button>
@@ -1560,7 +1574,7 @@ export default function ProjectDetailsPage() {
                                                                                             `/projects/${projectId}/tasks/${task.id}`
                                                                                         );
                                                                                     }}
-                                                                                    className="flex w-full items-center px-3 py-2.5 text-left text-sm text-[var(--text-primary)] transition hover:bg-[var(--surface-subtle)]"
+                                                                                    className="flex w-full items-center px-3 py-2.5 text-left text-sm text-[var(--text-primary)] transition-colors duration-150 hover:bg-[var(--surface-subtle)]"
                                                                                 >
                                                                                     Change status
                                                                                 </button>
@@ -1574,7 +1588,7 @@ export default function ProjectDetailsPage() {
                                                                                             `/projects/${projectId}/tasks/${task.id}`
                                                                                         );
                                                                                     }}
-                                                                                    className="flex w-full items-center px-3 py-2.5 text-left text-sm text-[var(--text-primary)] transition hover:bg-[var(--surface-subtle)]"
+                                                                                    className="flex w-full items-center px-3 py-2.5 text-left text-sm text-[var(--text-primary)] transition-colors duration-150 hover:bg-[var(--surface-subtle)]"
                                                                                 >
                                                                                     Assign
                                                                                 </button>
@@ -1714,7 +1728,7 @@ export default function ProjectDetailsPage() {
                             </div>
 
                             {activitiesLoading && (
-                                <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-6">
+                                <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-sm p-6">
                                     <div className="h-4 w-32 animate-pulse rounded bg-[var(--surface-subtle)]" />
 
                                     <div className="mt-4 h-3 w-64 animate-pulse rounded bg-[var(--surface-subtle)]" />
@@ -1726,7 +1740,7 @@ export default function ProjectDetailsPage() {
                             {activitiesError && (
                                 <div
                                     role="alert"
-                                    className="rounded-xl border border-red-200 bg-red-50 p-5"
+                                    className="rounded-2xl border border-red-200/80 bg-red-50/80 p-5 shadow-sm"
                                 >
                                     <p className="text-sm font-medium text-red-800">
                                         Unable to load activity.
@@ -1741,7 +1755,7 @@ export default function ProjectDetailsPage() {
                             {!activitiesLoading &&
                                 !activitiesError &&
                                 tasks.length === 0 && (
-                                    <div className="rounded-xl border border-dashed border-[var(--border)] bg-[var(--surface)] p-10 text-center">
+                                    <div className="rounded-2xl border border-dashed border-[var(--border)] bg-[var(--surface)] p-10 text-center shadow-sm">
                                         <p className="text-sm font-medium text-[var(--text-primary)]">
                                             No tasks yet
                                         </p>
@@ -1777,7 +1791,7 @@ export default function ProjectDetailsPage() {
                                             return (
                                                 <div
                                                     key={task.id}
-                                                    className="rounded-xl border border-[var(--border)] bg-[var(--surface)]"
+                                                    className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-sm"
                                                 >
                                                     <div className="border-b border-[var(--border)] px-5 py-4">
                                                         <button
@@ -1816,7 +1830,7 @@ export default function ProjectDetailsPage() {
                                                                         key={
                                                                             activity.id
                                                                         }
-                                                                        className="flex gap-3 px-5 py-4"
+                                                                        className="flex gap-3 px-5 py-4 transition-colors hover:bg-[var(--surface-subtle)]"
                                                                     >
                                                                         <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--surface-subtle)] text-xs font-semibold text-[var(--text-secondary)]">
                                                                             {activity
@@ -1863,7 +1877,7 @@ export default function ProjectDetailsPage() {
                     )}
 
                     {activeView === "archived" && (
-                        <div className="mt-4 overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)]">
+                        <div className="mt-4 overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-sm">
                             <div className="border-b border-[var(--border)] px-5 py-4">
                                 <div className="flex items-center justify-between gap-4">
                                     <div>
@@ -1934,7 +1948,7 @@ export default function ProjectDetailsPage() {
                                                 disabled={
                                                     updatingTaskId === task.id
                                                 }
-                                                className="shrink-0 rounded-lg border border-[var(--border)] px-3.5 py-2 text-sm font-medium text-[var(--text-secondary)] transition hover:bg-[var(--surface-subtle)]"
+                                                className="shrink-0 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2 text-sm font-semibold text-[var(--text-secondary)] shadow-sm transition-colors duration-150 hover:border-[var(--primary)] hover:bg-[var(--surface-subtle)]"
                                             >
                                                 {updatingTaskId === task.id
                                                     ? "Restoring..."
@@ -1948,7 +1962,7 @@ export default function ProjectDetailsPage() {
                     )}                                        
 
                     {createTaskModalOpen && (
-                        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/30 px-4 py-8 backdrop-blur-sm">
+                        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/55 px-4 py-8 backdrop-blur-md">
                             <button
                                 type="button"
                                 aria-label="Close create task dialog"
@@ -1962,7 +1976,7 @@ export default function ProjectDetailsPage() {
                                 role="dialog"
                                 aria-modal="true"
                                 aria-labelledby="create-task-title"
-                                className="relative z-10 max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-xl sm:p-7"
+                                className="relative z-10 max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-2xl sm:p-7"
                             >
                                 <div className="mb-5">
                                     <h2
@@ -2011,7 +2025,7 @@ export default function ProjectDetailsPage() {
                                             placeholder="e.g. Create login screen"
                                             required
                                             autoFocus
-                                            className="h-12 w-full rounded-xl border border-[var(--border)] bg-white px-4 text-sm outline-none transition placeholder:text-[var(--text-muted)] focus:border-[var(--primary)] focus:ring-4 focus:ring-[var(--accent)]/10"
+                                            className="h-12 w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 text-sm outline-none transition placeholder:text-[var(--text-muted)] focus:border-[var(--primary)] focus:ring-4 focus:ring-[var(--accent)]/10"
                                         />
                                     </div>
 
@@ -2033,7 +2047,7 @@ export default function ProjectDetailsPage() {
                                             }
                                             rows={3}
                                             placeholder="Describe the work to be done..."
-                                            className="w-full resize-none rounded-xl border border-[var(--border)] bg-white px-4 py-3 text-sm outline-none transition placeholder:text-[var(--text-muted)] focus:border-[var(--primary)] focus:ring-4 focus:ring-[var(--accent)]/10"
+                                            className="w-full resize-none rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-sm outline-none transition placeholder:text-[var(--text-muted)] focus:border-[var(--primary)] focus:ring-4 focus:ring-[var(--accent)]/10"
                                         />
                                     </div>
 
@@ -2054,7 +2068,7 @@ export default function ProjectDetailsPage() {
                                                         event.target.value
                                                     )
                                                 }
-                                                className="h-12 w-full rounded-xl border border-[var(--border)] bg-white px-4 text-sm outline-none focus:border-[var(--primary)] focus:ring-4 focus:ring-[var(--accent)]/10"
+                                                className="h-12 w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 text-sm outline-none focus:border-[var(--primary)] focus:ring-4 focus:ring-[var(--accent)]/10"
                                             >
                                                 <option value="LOW">
                                                     Low
@@ -2088,8 +2102,39 @@ export default function ProjectDetailsPage() {
                                                         event.target.value
                                                     )
                                                 }
-                                                className="h-12 w-full rounded-xl border border-[var(--border)] bg-white px-4 text-sm outline-none focus:border-[var(--primary)] focus:ring-4 focus:ring-[var(--accent)]/10"
+                                                className="h-12 w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 text-sm outline-none focus:border-[var(--primary)] focus:ring-4 focus:ring-[var(--accent)]/10"
                                             />
+                                        </div>
+
+                                        <div>
+                                            <label
+                                                htmlFor="create-task-assignee"
+                                                className="mb-2 block text-sm font-semibold"
+                                            >
+                                                Assignee
+                                            </label>
+
+                                            <select
+                                                id="create-task-assignee"
+                                                value={taskAssigneeId}
+                                                onChange={(event) =>
+                                                    setTaskAssigneeId(event.target.value)
+                                                }
+                                                className="h-12 w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 text-sm outline-none transition focus:border-[var(--primary)] focus:ring-4 focus:ring-[var(--accent)]/10"
+                                            >
+                                                <option value="">
+                                                    Unassigned
+                                                </option>
+
+                                                {organizationMembers.map((member) => (
+                                                    <option
+                                                        key={member.userId}
+                                                        value={member.userId}
+                                                    >
+                                                        {member.user.name}
+                                                    </option>
+                                                ))}
+                                            </select>
                                         </div>
                                     </div>
 
@@ -2099,7 +2144,7 @@ export default function ProjectDetailsPage() {
                                             onClick={() =>
                                                 setCreateTaskModalOpen(false)
                                             }
-                                            className="rounded-xl border border-[var(--border)] px-4 py-2.5 text-sm font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--surface-subtle)]"
+                                            className="rounded-xl border border-[var(--border)] px-4 py-2.5 text-sm font-semibold text-[var(--text-secondary)] transition-colors duration-150 hover:bg-[var(--surface-subtle)]"
                                         >
                                             Cancel
                                         </button>
@@ -2110,7 +2155,7 @@ export default function ProjectDetailsPage() {
                                                 savingTask ||
                                                 !taskTitle.trim()
                                             }
-                                            className="inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--primary)] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--primary-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+                                            className="inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--primary)] px-5 py-2.5 text-sm font-semibold text-white transition-colors duration-150 hover:bg-[var(--primary-hover)] disabled:cursor-not-allowed disabled:opacity-60"
                                         >
                                             {savingTask
                                                 ? "Creating..."
@@ -2123,8 +2168,8 @@ export default function ProjectDetailsPage() {
                     )}
 
                     {editProjectModalOpen && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-                            <div className="w-full max-w-md rounded-xl bg-[var(--surface)] p-6 shadow-xl">
+                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 backdrop-blur-sm">
+                            <div className="w-full max-w-md rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-6 shadow-2xl sm:p-7">
                                 <div className="mb-5">
                                     <h2 className="text-lg font-semibold text-[var(--text-primary)]">
                                         Edit Project
@@ -2156,7 +2201,7 @@ export default function ProjectDetailsPage() {
                                                     event.target.value
                                                 )
                                             }
-                                            className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-sm outline-none focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20"
+                                            className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-sm px-3 py-2.5 text-sm outline-none focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20"
                                             required
                                         />
                                     </div>
@@ -2178,7 +2223,7 @@ export default function ProjectDetailsPage() {
                                                 )
                                             }
                                             rows={4}
-                                            className="w-full resize-none rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-sm outline-none focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20"
+                                            className="w-full resize-none rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-sm px-3 py-2.5 text-sm outline-none focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20"
                                         />
                                     </div>
 
@@ -2196,7 +2241,7 @@ export default function ProjectDetailsPage() {
                                                     false
                                                 )
                                             }
-                                            className="rounded-lg border border-[var(--border)] px-4 py-2.5 text-sm font-medium text-[var(--text-secondary)] transition hover:bg-[var(--surface-subtle)]"
+                                            className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-sm font-medium text-[var(--text-secondary)] transition-colors duration-150 hover:bg-[var(--surface-subtle)]"
                                         >
                                             Cancel
                                         </button>
@@ -2204,7 +2249,7 @@ export default function ProjectDetailsPage() {
                                         <button
                                             type="submit"
                                             disabled={savingProject}
-                                            className="rounded-lg bg-[var(--primary)] px-4 py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                                            className="rounded-xl bg-[var(--primary)] px-4 py-2.5 shadow-sm text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
                                         >
                                             {savingProject
                                                 ? "Saving..."
