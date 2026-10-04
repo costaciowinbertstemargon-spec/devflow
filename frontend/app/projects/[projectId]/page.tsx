@@ -111,8 +111,9 @@ export default function ProjectDetailsPage() {
     const projectId = params.projectId as string;
     const router = useRouter();
 
-    const { user } = useAuth();
+    const { user, loading: authLoading } = useAuth();
     const [canManageTasks, setCanManageTasks] = useState(false);
+    const [loadAttempt, setLoadAttempt] = useState(0);
 
     const [project, setProject] = useState<Project | null>(null);
     const [loading, setLoading] = useState(true);
@@ -123,6 +124,7 @@ export default function ProjectDetailsPage() {
     const [tasks, setTasks] = useState<Task[]>([]);
     const [tasksLoading, setTasksLoading] = useState(true);
     const [tasksError, setTasksError] = useState("");
+    const [actionError, setActionError] = useState("");
 
     const [archivedTasks, setArchivedTasks] = useState<Task[]>([]);
     const [archivedLoading, setArchivedLoading] = useState(false);
@@ -183,7 +185,60 @@ export default function ProjectDetailsPage() {
     >("updated-desc");
 
     useEffect(() => {
+        function handleEscape(event: KeyboardEvent) {
+            if (event.key !== "Escape") {
+                return;
+            }
+
+            if (openTaskMenuId) {
+                setOpenTaskMenuId(null);
+                return;
+            }
+
+            if (filtersOpen) {
+                setFiltersOpen(false);
+                return;
+            }
+
+            if (createTaskModalOpen) {
+                setCreateTaskModalOpen(false);
+                return;
+            }
+
+            if (editProjectModalOpen) {
+                setEditProjectModalOpen(false);
+            }
+        }
+
+        document.addEventListener("keydown", handleEscape);
+
+        return () => {
+            document.removeEventListener(
+                "keydown",
+                handleEscape
+            );
+        };
+    }, [
+        openTaskMenuId,
+        filtersOpen,
+        createTaskModalOpen,
+        editProjectModalOpen,
+    ]);
+
+    useEffect(() => {
         async function loadProjectData() {
+            if (authLoading) {
+                return;
+            }
+
+            if (!user) {
+                setError("Authentication required.");
+                setLoading(false);
+                setTasksLoading(false);
+                setActivitiesLoading(false);
+                return;
+            }
+
             const token = getToken();
 
             if (!token) {
@@ -217,31 +272,32 @@ export default function ProjectDetailsPage() {
                 setActivitiesLoading(true);
                 setActivitiesError("");
 
-                const taskActivities =
-                    await Promise.all(
-                        tasksResult.map((task) =>
-                            getTaskActivities(
-                                task.id,
-                                token
+                const [taskActivities, organization] =
+                    await Promise.all([
+                        Promise.all(
+                            tasksResult.map((task) =>
+                                getTaskActivities(
+                                    task.id,
+                                    token
+                                )
                             )
-                        )
-                    );
+                        ),
+                        getOrganization(
+                            projectResult.organizationId,
+                            token
+                        ),
+                    ]);
 
-                setActivities(
-                    taskActivities.flat()
+                setActivities(taskActivities.flat());
+
+                setOrganizationMembers(
+                    organization.members
                 );
-
-                const organization = await getOrganization(
-                    projectResult.organizationId,
-                    token
-                );
-
-                setOrganizationMembers(organization.members);
 
                 const membership = organization.members.find(
                     (member) => member.user.id === user?.id
                 );
-                
+
                 setCanManageTasks(
                     membership?.role === "OWNER" ||
                     membership?.role === "ADMIN"
@@ -264,7 +320,20 @@ export default function ProjectDetailsPage() {
         }
 
         void loadProjectData();
-    }, [projectId, user?.id]);
+    }, [projectId, user?.id, authLoading, loadAttempt]);
+
+    async function refreshActivities(
+        currentTasks: Task[],
+        token: string
+    ) {
+        const taskActivities = await Promise.all(
+            currentTasks.map((task) =>
+                getTaskActivities(task.id, token)
+            )
+        );
+        
+        setActivities(taskActivities.flat());
+    }
 
     async function handleCreateTask(
         event: React.FormEvent<HTMLFormElement>    
@@ -313,6 +382,8 @@ export default function ProjectDetailsPage() {
                 );
             
             setTasks(updatedTasks);
+
+            await refreshActivities(updatedTasks, token);
 
             setCreateTaskModalOpen(false);
             setTaskTitle("");
@@ -393,26 +464,19 @@ export default function ProjectDetailsPage() {
         }
 
         setUpdatingTaskId(taskId);
+        setTasksError("");
 
         try {
-            const updatedTask = await updateTask(
-                taskId,
-                token,
-                {
-                    status,
-                }
+            const updatedTask = await updateTask(taskId, token, { status });
+
+            const updatedTasks = tasks.map((task) =>
+                task.id === taskId
+                    ? { ...task, ...updatedTask }
+                    : task
             );
 
-            setTasks((currentTasks) =>
-                currentTasks.map((task) =>
-                    task.id === taskId
-                        ? {
-                            ...task,
-                            ...updatedTask,
-                        }
-                        : task
-                )
-            );
+            setTasks(updatedTasks);
+            await refreshActivities(updatedTasks, token);
         } catch (error) {
             setTasksError(
                 error instanceof Error
@@ -433,9 +497,7 @@ export default function ProjectDetailsPage() {
         }
 
         if (!canManageTasks) {
-            setError(
-                "You do not have permission to archive this task."
-            );
+            setActionError("You do not have permission to archive this task.");
             return;
         }
 
@@ -443,34 +505,25 @@ export default function ProjectDetailsPage() {
             "Archive this task? It will be hidden from the active project views and can be restored later by an administrator or owner."
         );
 
-        if (!confirmed) {
-            return;
-        }
+        if (!confirmed) return;
 
         setUpdatingTaskId(taskId);
+        setActionError("");
 
         try {
-            const archivedTask = await archiveTask(
-                taskId,
-                token
-            );
+            const archivedTask = await archiveTask(taskId, token);
+            const updatedTasks = tasks.filter((task) => task.id !== taskId);
 
-            setTasks((currentTasks) =>
-                currentTasks.filter(
-                    (task) => task.id !== taskId
-                )
-            );
-
+            setTasks(updatedTasks);
             setArchivedTasks((currentTasks) => [
                 archivedTask,
-                ...currentTasks.filter(
-                    (task) => task.id !== taskId
-                ),
+                ...currentTasks.filter((task) => task.id !== taskId),
             ]);
 
+            await refreshActivities(updatedTasks, token);
             setOpenTaskMenuId(null);
         } catch (error) {
-            setTasksError(
+            setActionError(
                 error instanceof Error
                     ? error.message
                     : "Failed to archive task."
@@ -492,6 +545,7 @@ export default function ProjectDetailsPage() {
             return;
         }
 
+        setActionError("");
         setArchivedLoading(true);
 
         try {
@@ -502,7 +556,7 @@ export default function ProjectDetailsPage() {
 
             setArchivedTasks(result);
         } catch (error) {
-            setTasksError(
+            setActionError(
                 error instanceof Error
                     ? error.message
                     : "Failed to load archived tasks."
@@ -522,6 +576,7 @@ export default function ProjectDetailsPage() {
         }
 
         try {
+            setActionError("");
             setUpdatingTaskId(taskId);
 
             await restoreTask(taskId, token);
@@ -538,12 +593,14 @@ export default function ProjectDetailsPage() {
             );
 
             setTasks(refreshedTasks);
+            await refreshActivities(refreshedTasks, token);
 
             setOpenTaskMenuId(null);
         } catch (error) {
-            console.error(
-                "Failed to restore task:",
-                error
+            setActionError(
+                error instanceof Error
+                    ? error.message
+                    : "Failed to restore task."
             );
         } finally {
             setUpdatingTaskId(null);
@@ -697,7 +754,7 @@ export default function ProjectDetailsPage() {
 
                             <button
                                 type="button"
-                                onClick={() => window.location.reload()}
+                                onClick={() => setLoadAttempt((current) => current + 1)}
                                 className="mt-3 inline-flex items-center rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-sm px-4 py-2.5 text-sm font-semibold text-[var(--text-secondary)] transition-colors duration-150 hover:bg-[var(--surface-subtle)]"
                             >
                                 Try Again
@@ -758,27 +815,27 @@ export default function ProjectDetailsPage() {
                                             <Users size={16} />
                                             Members
                                         </Link>
+                                        {canManageTasks && (
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    if (!project) {
+                                                        return;
+                                                    }
 
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                if (!project) {
-                                                    return;
-                                                }
-
-                                                setProjectName(project.name);
-                                                setProjectDescription(
-                                                    project.description ?? ""
-                                                );
-                                                setProjectFormError("");
-                                                setEditProjectModalOpen(true);
-                                            }}
-                                            className="rounded-xl p-2.5 text-[var(--text-secondary)] transition-colors duration-150 hover:bg-[var(--surface-subtle)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2"
-                                            aria-label="Edit project"
-                                            title="Edit project"
-                                        >
-                                            <MoreHorizontal size={19} />
-                                        </button>
+                                                    setProjectName(project.name);
+                                                    setProjectDescription(
+                                                        project.description ?? ""
+                                                    );
+                                                    setProjectFormError("");
+                                                    setEditProjectModalOpen(true);
+                                                }}
+                                                className="inline-flex items-center justify-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2.5 text-sm font-medium text-[var(--text-secondary)] shadow-sm transition-colors duration-150 hover:bg-[var(--surface-subtle)] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2"
+                                            >
+                                                <MoreHorizontal size={17} />
+                                                Edit project
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
 
@@ -834,10 +891,11 @@ export default function ProjectDetailsPage() {
                                         onClick={() =>
                                             setActiveView("tasks")
                                         }
+                                        aria-pressed={activeView === "tasks"}
                                         className={
                                             activeView === "tasks"
                                                 ? "rounded-xl bg-[var(--primary)] px-3.5 py-2.5 shadow-sm text-sm font-semibold text-white"
-                                                : "rounded-xl px-3.5 py-2.5 text-sm font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-subtle)]"
+                                                : "rounded-xl px-3.5 py-2.5 text-sm font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-subtle)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2"
                                         }
                                     >
                                         Tasks
@@ -849,10 +907,11 @@ export default function ProjectDetailsPage() {
                                             onClick={() =>
                                                 setActiveView("board")
                                             }
+                                            aria-pressed={activeView === "board"}
                                             className={
                                                 activeView === "board"
                                                     ? "rounded-xl bg-[var(--primary)] px-3.5 py-2.5 shadow-sm text-sm font-semibold text-white"
-                                                    : "rounded-xl px-3.5 py-2.5 text-sm font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-subtle)]"
+                                                    : "rounded-xl px-3.5 py-2.5 text-sm font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-subtle)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2"
                                             }
                                         >
                                             Board
@@ -864,10 +923,11 @@ export default function ProjectDetailsPage() {
                                         onClick={() =>
                                             setActiveView("activity")
                                         }
+                                        aria-pressed={activeView === "activity"}
                                         className={
                                             activeView === "activity"
                                                 ? "rounded-xl bg-[var(--primary)] px-3.5 py-2.5 shadow-sm text-sm font-semibold text-white"
-                                                : "rounded-xl px-3.5 py-2.5 text-sm font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-subtle)]"
+                                                : "rounded-xl px-3.5 py-2.5 text-sm font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-subtle)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2"
                                         }
                                     >
                                         Activity
@@ -880,10 +940,11 @@ export default function ProjectDetailsPage() {
                                                 setActiveView("archived");
                                                 void loadArchivedTasks();
                                             }}
+                                            aria-pressed={activeView === "archived"}
                                             className={
                                                 activeView === "archived"
                                                     ? "rounded-xl bg-[var(--primary)] px-3.5 py-2.5 shadow-sm text-sm font-semibold text-white"
-                                                    : "rounded-xl px-3.5 py-2.5 text-sm font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-subtle)]"
+                                                    : "rounded-xl px-3.5 py-2.5 text-sm font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-subtle)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2"
                                             }
                                         >
                                             Archived
@@ -929,6 +990,7 @@ export default function ProjectDetailsPage() {
                                                     setSearch(event.target.value)
                                                 }
                                                 placeholder="Search tasks..."
+                                                aria-label="Search tasks"
                                                 className="h-11 w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-sm pl-10 pr-4 text-sm outline-none transition placeholder:text-[var(--text-muted)] focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--accent)]/20 focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
                                             />
                                         </div>
@@ -940,13 +1002,15 @@ export default function ProjectDetailsPage() {
                                                     (current) => !current
                                                 )
                                             }
+                                            aria-pressed={filtersOpen}
+                                            aria-controls="task-filters"
                                             className={`inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg border px-4 text-sm font-medium transition sm:w-auto ${
                                                 filtersOpen ||
                                                 statusFilter !== "ALL" ||
                                                 priorityFilter !== "ALL"
                                                     ? "border-[var(--primary)] bg-[var(--primary)]/5 text-[var(--primary)]"
                                                     : "border-[var(--border)] bg-[var(--surface)] text-[var(--text-secondary)] hover:bg-[var(--surface-subtle)]"
-                                            }focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2`}                             
+                                            } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2`}                             
                                         >
                                             <Filter size={16} />
                                             Filters
@@ -954,7 +1018,10 @@ export default function ProjectDetailsPage() {
                                     </div>
 
                                     {filtersOpen && (
-                                        <div className="mt-3 rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-sm p-4 shadow-sm">
+                                        <div 
+                                            id="task-filters"
+                                            className="mt-3 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-sm"
+                                        >
                                             <div className="grid gap-4 md:grid-cols-3">
                                                 <div>
                                                     <label
@@ -1126,7 +1193,7 @@ export default function ProjectDetailsPage() {
 
                                             <button
                                                 type="button"
-                                                onClick={() => window.location.reload()}
+                                                onClick={() => setLoadAttempt((current) => current + 1)}
                                                 className="mt-3 inline-flex items-center rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-sm px-4 py-2.5 text-sm font-semibold text-[var(--text-secondary)] transition-colors duration-150 hover:bg-[var(--surface-subtle)]"
                                             >
                                                 Try Again
@@ -1153,20 +1220,26 @@ export default function ProjectDetailsPage() {
                                             </p>
 
                                             {tasks.length === 0 ? (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => {
-                                                        setTaskFormError("");
-                                                        setTaskTitle("");
-                                                        setTaskDescription("");
-                                                        setTaskPriority("MEDIUM");
-                                                        setTaskDueDate("");
-                                                        setCreateTaskModalOpen(true);
-                                                    }}
-                                                    className="mt-5 inline-flex items-center justify-center rounded-xl bg-[var(--primary)] px-4 py-2.5 shadow-sm text-sm font-semibold text-white transition-colors duration-150 hover:bg-[var(--primary-hover)]"
-                                                >
-                                                    Add your first task
-                                                </button>
+                                                canManageTasks ? (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setTaskFormError("");
+                                                            setTaskTitle("");
+                                                            setTaskDescription("");
+                                                            setTaskPriority("MEDIUM");
+                                                            setTaskDueDate("");
+                                                            setCreateTaskModalOpen(true);
+                                                        }}
+                                                        className="mt-5 inline-flex items-center justify-center rounded-xl bg-[var(--primary)] px-4 py-2.5 shadow-sm text-sm font-semibold text-white transition-colors duration-150 hover:bg-[var(--primary-hover)]"
+                                                    >
+                                                        Add your first task
+                                                    </button>
+                                                ) : (
+                                                    <p className="mt-5 text-sm text-[var(--text-muted)]">
+                                                        Only project administrators and owners can create tasks.
+                                                    </p>
+                                                )
                                             ) : (
                                                 <button
                                                     type="button"
@@ -1218,25 +1291,42 @@ export default function ProjectDetailsPage() {
                                                             </p>
                                                         </button>
 
-                                                        <button
-                                                            type="button"
-                                                            onClick={() =>
-                                                                router.push(
-                                                                    `/projects/${projectId}/tasks/${task.id}`
-                                                                )
-                                                            }
-                                                            className="flex items-center gap-2 text-left text-sm text-[var(--text-secondary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] md:text-left"
-                                                        >
-                                                            {getStatusIcon(task.status)}
+                                                        <div>
+                                                            {canManageTasks ? (
+                                                                <label className="sr-only" htmlFor={`task-list-status-${task.id}`}>
+                                                                    Status for {task.title}
+                                                                </label>
+                                                            ) : null}
 
-                                                            <span>
-                                                                {getStatusLabel(task.status)}
-                                                            </span>
-                                                        </button>
+                                                            {canManageTasks ? (
+                                                                <select
+                                                                    id={`task-list-status-${task.id}`}
+                                                                    value={task.status}
+                                                                    onChange={(event) => {
+                                                                        void handleTaskStatusChange(
+                                                                            task.id,
+                                                                            event.target.value
+                                                                        );
+                                                                    }}
+                                                                    disabled={updatingTaskId === task.id}
+                                                                    className="h-9 w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2.5 text-xs font-medium text-[var(--text-secondary)] outline-none transition focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--accent)]/20 disabled:cursor-not-allowed disabled:opacity-60"
+                                                                >
+                                                                    <option value="TODO">To Do</option>
+                                                                    <option value="IN_PROGRESS">In Progress</option>
+                                                                    <option value="REVIEW">Review</option>
+                                                                    <option value="DONE">Done</option>
+                                                                </select>
+                                                            ) : (
+                                                                <span className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--surface-subtle)] px-2.5 py-1.5 text-xs font-medium text-[var(--text-secondary)]">
+                                                                    {getStatusIcon(task.status)}
+                                                                    {getStatusLabel(task.status)}
+                                                                </span>
+                                                            )}
+                                                        </div>
 
                                                         <div>
                                                             <span
-                                                                className={`inline-flex rounded-md px-2 py-1 text-xs font-medium ${
+                                                                className={`inline-flex rounded-lg px-2.5 py-1.5 text-xs font-medium ${
                                                                     task.priority === "URGENT"
                                                                         ? "bg-red-100 text-red-700"
                                                                         : task.priority === "HIGH"
@@ -1246,11 +1336,21 @@ export default function ProjectDetailsPage() {
                                                                         : "bg-gray-100 text-gray-600"
                                                                 }`}
                                                             >
-                                                                {task.priority}
+                                                                {task.priority === "URGENT"
+                                                                    ? "Urgent"
+                                                                    : task.priority === "HIGH"
+                                                                    ? "High"
+                                                                    : task.priority === "MEDIUM"
+                                                                    ? "Medium"
+                                                                    : "Low"}
                                                             </span>
                                                         </div>
 
-                                                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--surface-subtle)] text-xs font-semibold text-[var(--primary)]">
+                                                        <div
+                                                            className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--surface-subtle)] text-xs font-semibold text-[var(--primary)]"
+                                                            title={task.assignee?.name ?? "Unassigned"}
+                                                            aria-label={`Assignee: ${task.assignee?.name ?? "Unassigned"}`}
+                                                        >
                                                             {task.assignee?.name
                                                                 ? task.assignee.name
                                                                     .slice(0, 2)
@@ -1275,9 +1375,9 @@ export default function ProjectDetailsPage() {
 
                                                                         const menuHeight = 220;
                                                                         const menuWidth = 176;
+
                                                                         const spaceBelow =
-                                                                            window.innerHeight -
-                                                                            buttonRect.bottom;
+                                                                            window.innerHeight - buttonRect.bottom;
 
                                                                         const placement =
                                                                             spaceBelow < menuHeight
@@ -1297,7 +1397,7 @@ export default function ProjectDetailsPage() {
 
                                                                         setOpenTaskMenuId(task.id);
                                                                     }}
-                                                                    className="rounded-xl p-2 text-[var(--text-muted)] transition-colors duration-150 hover:bg-[var(--surface-subtle)] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+                                                                    className="inline-flex min-h-10 min-w-10 items-center justify-center rounded-xl p-2 text-[var(--text-muted)] transition-colors duration-150 hover:bg-[var(--surface-subtle)] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
                                                                     aria-label={`Actions for ${task.title}`}
                                                                     aria-expanded={
                                                                         openTaskMenuId === task.id
@@ -1326,51 +1426,8 @@ export default function ProjectDetailsPage() {
                                                                         }}
                                                                         className="flex w-full items-center px-3 py-2.5 text-left text-sm text-[var(--text-primary)] transition-colors duration-150 hover:bg-[var(--surface-subtle)]"
                                                                     >
-                                                                        Open
+                                                                        Open task
                                                                     </button>
-
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => {
-                                                                            setOpenTaskMenuId(null);
-
-                                                                            router.push(
-                                                                                `/projects/${projectId}/tasks/${task.id}`
-                                                                            );
-                                                                        }}
-                                                                        className="flex w-full items-center px-3 py-2.5 text-left text-sm text-[var(--text-primary)] transition-colors duration-150 hover:bg-[var(--surface-subtle)]"
-                                                                    >
-                                                                        Edit
-                                                                    </button>
-
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => {
-                                                                            setOpenTaskMenuId(null);
-
-                                                                            router.push(
-                                                                                `/projects/${projectId}/tasks/${task.id}`
-                                                                            );
-                                                                        }}
-                                                                        className="flex w-full items-center px-3 py-2.5 text-left text-sm text-[var(--text-primary)] transition-colors duration-150 hover:bg-[var(--surface-subtle)]"
-                                                                    >
-                                                                        Change status
-                                                                    </button>
-
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => {
-                                                                            setOpenTaskMenuId(null);
-
-                                                                            router.push(
-                                                                                `/projects/${projectId}/tasks/${task.id}`
-                                                                            );
-                                                                        }}
-                                                                        className="flex w-full items-center px-3 py-2.5 text-left text-sm text-[var(--text-primary)] transition-colors duration-150 hover:bg-[var(--surface-subtle)]"
-                                                                    >
-                                                                        Assign
-                                                                    </button>
-
                                                                     {canManageTasks && (
                                                                         <>
                                                                             <div className="my-1 border-t border-[var(--border)]" />
@@ -1508,15 +1565,25 @@ export default function ProjectDetailsPage() {
                                                                                     event.currentTarget.getBoundingClientRect();
 
                                                                                 const menuHeight = 220;
+                                                                                const menuWidth = 176;
                                                                                 const spaceBelow =
                                                                                     window.innerHeight -
                                                                                     buttonRect.bottom;
 
-                                                                                setTaskMenuPlacement(
+                                                                                const placement =
                                                                                     spaceBelow < menuHeight
                                                                                         ? "top"
-                                                                                        : "bottom"
-                                                                                );
+                                                                                        : "bottom";
+
+                                                                                setTaskMenuPlacement(placement);
+                                                                                setTaskMenuPosition({
+                                                                                    top:
+                                                                                        placement === "top"
+                                                                                            ? buttonRect.top - menuHeight
+                                                                                            : buttonRect.bottom + 4,
+                                                                                    left:
+                                                                                        buttonRect.right - menuWidth,
+                                                                                });
 
                                                                                 setOpenTaskMenuId(task.id);
                                                                             }}
@@ -1548,51 +1615,8 @@ export default function ProjectDetailsPage() {
                                                                                     }}
                                                                                     className="flex w-full items-center px-3 py-2.5 text-left text-sm text-[var(--text-primary)] transition-colors duration-150 hover:bg-[var(--surface-subtle)]"
                                                                                 >
-                                                                                    Open
+                                                                                    Open task
                                                                                 </button>
-
-                                                                                <button
-                                                                                    type="button"
-                                                                                    onClick={() => {
-                                                                                        setOpenTaskMenuId(null);
-
-                                                                                        router.push(
-                                                                                            `/projects/${projectId}/tasks/${task.id}`
-                                                                                        );
-                                                                                    }}
-                                                                                    className="flex w-full items-center px-3 py-2.5 text-left text-sm text-[var(--text-primary)] transition-colors duration-150 hover:bg-[var(--surface-subtle)]"
-                                                                                >
-                                                                                    Edit
-                                                                                </button>
-
-                                                                                <button
-                                                                                    type="button"
-                                                                                    onClick={() => {
-                                                                                        setOpenTaskMenuId(null);
-
-                                                                                        router.push(
-                                                                                            `/projects/${projectId}/tasks/${task.id}`
-                                                                                        );
-                                                                                    }}
-                                                                                    className="flex w-full items-center px-3 py-2.5 text-left text-sm text-[var(--text-primary)] transition-colors duration-150 hover:bg-[var(--surface-subtle)]"
-                                                                                >
-                                                                                    Change status
-                                                                                </button>
-
-                                                                                <button
-                                                                                    type="button"
-                                                                                    onClick={() => {
-                                                                                        setOpenTaskMenuId(null);
-
-                                                                                        router.push(
-                                                                                            `/projects/${projectId}/tasks/${task.id}`
-                                                                                        );
-                                                                                    }}
-                                                                                    className="flex w-full items-center px-3 py-2.5 text-left text-sm text-[var(--text-primary)] transition-colors duration-150 hover:bg-[var(--surface-subtle)]"
-                                                                                >
-                                                                                    Assign
-                                                                                </button>
-
                                                                                 {canManageTasks && (
                                                                                     <>
                                                                                         <div className="my-1 border-t border-[var(--border)]" />
@@ -1684,7 +1708,7 @@ export default function ProjectDetailsPage() {
                                                                         disabled={
                                                                             updatingTaskId === task.id
                                                                         }
-                                                                        className="h-9 w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 text-xs text-[var(--text-primary)] outline-none transition focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--accent)]/20 disabled:cursor-not-allowed disabled:opacity-60"
+                                                                        className="h-9 w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2.5 text-xs font-medium text-[var(--text-secondary)] outline-none transition focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--accent)]/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-60"                                                                    
                                                                     >
                                                                         <option value="TODO">
                                                                             To Do
@@ -1895,6 +1919,15 @@ export default function ProjectDetailsPage() {
                                     </div>
                                 </div>
                             </div>
+
+                            {actionError && (
+                                <div
+                                    role="alert"
+                                    className="border-b border-red-200 bg-red-50 px-5 py-3 text-sm text-red-700"
+                                >
+                                    {actionError}
+                                </div>
+                            )}
 
                             {archivedLoading ? (
                                 <div className="px-5 py-12 text-center text-sm text-[var(--text-muted)]">
@@ -2168,10 +2201,27 @@ export default function ProjectDetailsPage() {
                     )}
 
                     {editProjectModalOpen && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 backdrop-blur-sm">
-                            <div className="w-full max-w-md rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-6 shadow-2xl sm:p-7">
+                        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 px-4 py-8 backdrop-blur-sm">
+                            <button
+                                type="button"
+                                aria-label="Close edit project dialog"
+                                onClick={() =>
+                                    setEditProjectModalOpen(false)
+                                }
+                                className="absolute inset-0 cursor-default"
+                            />
+
+                            <div
+                                role="dialog"
+                                aria-modal="true"
+                                aria-labelledby="edit-project-title"
+                                className="relative z-10 max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-6 shadow-2xl sm:p-7"
+                            >
                                 <div className="mb-5">
-                                    <h2 className="text-lg font-semibold text-[var(--text-primary)]">
+                                    <h2
+                                        id="edit-project-title"
+                                        className="text-lg font-semibold text-[var(--text-primary)]"
+                                    >
                                         Edit Project
                                     </h2>
 
@@ -2228,7 +2278,10 @@ export default function ProjectDetailsPage() {
                                     </div>
 
                                     {projectFormError && (
-                                        <p className="text-sm text-red-600">
+                                        <p 
+                                            role="alert"
+                                            className="text-sm text-red-600"
+                                        >
                                             {projectFormError}
                                         </p>
                                     )}
