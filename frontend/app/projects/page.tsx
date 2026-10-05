@@ -17,6 +17,7 @@ import {
     useEffect,
     useMemo,
     useState,
+    useRef,
 } from "react";
 
 export default function ProjectsPage() {
@@ -26,11 +27,14 @@ export default function ProjectsPage() {
     } = useOrganization();
     const { user } = useAuth();
     const [canCreateProject, setCanCreateProject] = useState(false);
+    const createProjectButtonRef = useRef<HTMLButtonElement>(null);
 
     const [projects, setProjects] = useState<Project[]>([]);
     const [loading, setLoading] = useState(true);
+    const [loadAttempt, setLoadAttempt] = useState(0);
     const [error, setError] = useState("");
     const [search, setSearch] = useState("");
+    const [sortBy, setSortBy] = useState<"updated" | "created" | "name-asc" | "name-desc">("updated");
     const [createModalOpen, setCreateModalOpen] = useState(false);
     const [projectName, setProjectName] = useState("");
     const [projectDescription, setProjectDescription] = useState("");
@@ -79,6 +83,7 @@ export default function ProjectsPage() {
     }, [
         activeOrganization,
         organizationLoading,
+        loadAttempt,
     ]);
 
     useEffect(() => {
@@ -132,6 +137,35 @@ export default function ProjectsPage() {
         organizationLoading,
         user,
     ]);
+
+    useEffect(() => {
+        if (!createModalOpen) {
+            return;
+        }
+
+        function handleEscape(event: KeyboardEvent) {
+            if (event.key === "Escape" && !creatingProject) {
+                setCreateModalOpen(false);
+            }
+        }
+
+        document.addEventListener("keydown", handleEscape);
+
+        return () => {
+            document.removeEventListener(
+                "keydown",
+                handleEscape
+            );
+        };
+    }, [createModalOpen, creatingProject]);
+
+    useEffect(() => {
+        if (createModalOpen) {
+            return;
+        }
+
+        createProjectButtonRef.current?.focus();
+    }, [createModalOpen]);
 
     async function handleCreateProject(
         event: React.FormEvent<HTMLFormElement>    
@@ -189,11 +223,11 @@ export default function ProjectsPage() {
     const filteredProjects = useMemo(() => {
         const query = search.trim().toLowerCase();
 
-        if (!query) {
-            return projects;
-        }
+        const filtered = projects.filter((project) => {
+            if (!query) {
+                return true;
+            }
 
-        return projects.filter((project) => {
             return (
                 project.name
                     .toLowerCase()
@@ -203,7 +237,29 @@ export default function ProjectsPage() {
                     .includes(query)
             );
         });
-    }, [projects, search]);
+
+        return [...filtered].sort((a, b) => {
+            if (sortBy === "name-asc") {
+                return a.name.localeCompare(b.name);
+            }
+
+            if (sortBy === "name-desc") {
+                return b.name.localeCompare(a.name);
+            }
+
+            if (sortBy === "created") {
+                return (
+                    new Date(b.createdAt).getTime() -
+                    new Date(a.createdAt).getTime()
+                );
+            }
+
+            return (
+                new Date(b.updatedAt).getTime() -
+                new Date(a.updatedAt).getTime()
+            );
+        });
+    }, [projects, search, sortBy]);
 
     return (
         <ProtectedRoute>
@@ -227,6 +283,7 @@ export default function ProjectsPage() {
 
                         {canCreateProject && (
                             <button
+                                ref={createProjectButtonRef}
                                 type="button"
                                 onClick={() => {
                                     setCreateError("");
@@ -243,25 +300,77 @@ export default function ProjectsPage() {
                     </div>
 
                     {/* Search */}
-                    <div className="mb-6">
-                        <div className="relative">
+                    <div className="flex flex-col gap-3 sm:flex-row">
+                        <div className="relative flex-1">
                             <Search
                                 size={18}
                                 className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]"
                             />
 
+                            <label
+                                htmlFor="project-search"
+                                className="sr-only"
+                            >
+                                Search projects
+                            </label>
+
                             <input
+                                id="project-search"
                                 type="search"
                                 value={search}
                                 onChange={(event) =>
-                                    setSearch(
-                                        event.target.value
-                                    )
+                                    setSearch(event.target.value)
                                 }
                                 placeholder="Search projects..."
-                               className="h-11 w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] pl-10 pr-4 text-sm outline-none transition placeholder:text-[var(--text-muted)] focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--accent)]/20 focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
+                                className="h-11 w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] pl-10 pr-4 text-sm outline-none transition placeholder:text-[var(--text-muted)] focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--accent)]/20 focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
                             />
                         </div>
+
+                        <div className="flex items-center gap-2 sm:w-56">
+                            <label
+                                htmlFor="project-sort"
+                                className="whitespace-nowrap text-sm font-medium text-[var(--text-secondary)]"
+                            >
+                                Sort by
+                            </label>
+
+                            <select
+                                id="project-sort"
+                                value={sortBy}
+                                onChange={(event) =>
+                                    setSortBy(
+                                        event.target.value as
+                                            | "updated"
+                                            | "created"
+                                            | "name-asc"
+                                            | "name-desc"
+                                    )
+                                }
+                                className="h-11 w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 text-sm outline-none transition focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--accent)]/20"
+                            >
+                                <option value="updated">
+                                    Recently updated
+                                </option>
+                                <option value="created">
+                                    Recently created
+                                </option>
+                                <option value="name-asc">
+                                    Name A–Z
+                                </option>
+                                <option value="name-desc">
+                                    Name Z–A
+                                </option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div className="mt-3 flex items-center justify-between">
+                        <p className="text-sm text-[var(--text-muted)]">
+                            {filteredProjects.length}{" "}
+                            {filteredProjects.length === 1
+                                ? "project"
+                                : "projects"}
+                        </p>
                     </div>
 
                     {/* Organization loading */}
@@ -322,9 +431,22 @@ export default function ProjectsPage() {
                     {!loading && error && (
                         <div
                             role="alert"
-                            className="rounded-xl border border-red-200 bg-red-50 p-5 text-sm text-red-700"
+                            className="rounded-xl border border-red-200 bg-red-50 p-5"
                         >
-                            {error}
+                            <p className="text-sm text-red-700">
+                                {error}
+                            </p>
+
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setError("");
+                                    setLoadAttempt((attempt) => attempt + 1);
+                                }}
+                                className="mt-4 inline-flex items-center justify-center rounded-lg border border-red-200 bg-white px-4 py-2.5 text-sm font-semibold text-red-700 transition hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"
+                            >
+                                Try again
+                            </button>
                         </div>
                     )}
 
@@ -348,13 +470,20 @@ export default function ProjectsPage() {
                             </p>
 
                             {projects.length === 0 ? (
-                                <button
-                                    type="button"
-                                    onClick={() => setCreateModalOpen(true)}
-                                    className="mt-5 inline-flex items-center justify-center rounded-lg bg-[var(--primary)] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--primary-hover)]"
-                                >
-                                    Create your first project
-                                </button>
+                                canCreateProject ? (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setCreateError("");
+                                            setProjectName("");
+                                            setProjectDescription("");
+                                            setCreateModalOpen(true);
+                                        }}
+                                        className="mt-5 inline-flex items-center justify-center rounded-lg bg-[var(--primary)] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--primary-hover)]"
+                                    >
+                                        Create your first project
+                                    </button>
+                                ) : null
                             ) : (
                                 <button
                                     type="button"
@@ -418,15 +547,29 @@ export default function ProjectsPage() {
                                                 </div>
 
                                                 <div className="text-sm text-[var(--text-secondary)]">
+                                                    <span className="mr-2 font-medium text-[var(--text-muted)] md:hidden">
+                                                        Created
+                                                    </span>
                                                     {new Date(
                                                         project.createdAt
-                                                    ).toLocaleDateString()}
+                                                    ).toLocaleDateString("en-US", {
+                                                        month: "short",
+                                                        day: "numeric",
+                                                        year: "numeric",
+                                                    })}
                                                 </div>
 
                                                 <div className="text-sm text-[var(--text-secondary)]">
+                                                    <span className="mr-2 font-medium text-[var(--text-muted)] md:hidden">
+                                                        Updated
+                                                    </span>
                                                     {new Date(
                                                         project.updatedAt
-                                                    ).toLocaleDateString()}
+                                                    ).toLocaleDateString("en-US", {
+                                                        month: "short",
+                                                        day: "numeric",
+                                                        year: "numeric",
+                                                    })}
                                                 </div>
                                             </Link>
                                         )
@@ -440,9 +583,11 @@ export default function ProjectsPage() {
                             <button
                                 type="button"
                                 aria-label="Close create project dialog"
-                                onClick={() =>
-                                    setCreateModalOpen(false)
-                                }
+                                onClick={() => {
+                                    if (!creatingProject) {
+                                        setCreateModalOpen(false);
+                                    }
+                                }}
                                 className="absolute inset-0 cursor-default"
                             />
 
@@ -473,11 +618,14 @@ export default function ProjectsPage() {
 
                                     <button
                                         type="button"
-                                        onClick={() =>
-                                            setCreateModalOpen(false)
-                                        }
+                                        onClick={() => {
+                                            if (!creatingProject) {
+                                                setCreateModalOpen(false);
+                                            }
+                                        }}
+                                        disabled={creatingProject}
                                         aria-label="Close dialog"
-                                        className="rounded-lg p-2 text-[var(--text-muted)] transition hover:bg-[var(--surface-subtle)] hover:text-[var(--text-primary)]"
+                                        className="rounded-lg p-2 text-[var(--text-muted)] transition hover:bg-[var(--surface-subtle)] hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-50"
                                     >
                                         <X size={19} />
                                     </button>
@@ -561,10 +709,13 @@ export default function ProjectsPage() {
                                     <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-end">
                                         <button
                                             type="button"
-                                            onClick={() =>
-                                                setCreateModalOpen(false)
-                                            }
-                                            className="rounded-xl border border-[var(--border)] px-4 py-2.5 text-sm font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--surface-subtle)]"
+                                            onClick={() => {
+                                                if (!creatingProject) {
+                                                    setCreateModalOpen(false);
+                                                }
+                                            }}
+                                            disabled={creatingProject}
+                                            className="rounded-xl border border-[var(--border)] px-4 py-2.5 text-sm font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--surface-subtle)] disabled:cursor-not-allowed disabled:opacity-50"
                                         >
                                             Cancel
                                         </button>
