@@ -1359,53 +1359,51 @@ export default function ProjectDetailsPage() {
                                                         </div>
 
                                                         <div className="relative flex justify-end">
-                                                            {canManageTasks && (
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={(event) => {
-                                                                        event.stopPropagation();
+                                                            <button
+                                                                type="button"
+                                                                onClick={(event) => {
+                                                                    event.stopPropagation();
 
-                                                                        if (openTaskMenuId === task.id) {
-                                                                            setOpenTaskMenuId(null);
-                                                                            return;
-                                                                        }
-
-                                                                        const buttonRect =
-                                                                            event.currentTarget.getBoundingClientRect();
-
-                                                                        const menuHeight = 220;
-                                                                        const menuWidth = 176;
-
-                                                                        const spaceBelow =
-                                                                            window.innerHeight - buttonRect.bottom;
-
-                                                                        const placement =
-                                                                            spaceBelow < menuHeight
-                                                                                ? "top"
-                                                                                : "bottom";
-
-                                                                        setTaskMenuPlacement(placement);
-
-                                                                        setTaskMenuPosition({
-                                                                            top:
-                                                                                placement === "top"
-                                                                                    ? buttonRect.top - menuHeight
-                                                                                    : buttonRect.bottom + 4,
-                                                                            left:
-                                                                                buttonRect.right - menuWidth,
-                                                                        });
-
-                                                                        setOpenTaskMenuId(task.id);
-                                                                    }}
-                                                                    className="inline-flex min-h-10 min-w-10 items-center justify-center rounded-xl p-2 text-[var(--text-muted)] transition-colors duration-150 hover:bg-[var(--surface-subtle)] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
-                                                                    aria-label={`Actions for ${task.title}`}
-                                                                    aria-expanded={
-                                                                        openTaskMenuId === task.id
+                                                                    if (openTaskMenuId === task.id) {
+                                                                        setOpenTaskMenuId(null);
+                                                                        return;
                                                                     }
-                                                                >
-                                                                    <MoreHorizontal size={18} />
-                                                                </button>
-                                                            )}
+
+                                                                    const buttonRect =
+                                                                        event.currentTarget.getBoundingClientRect();
+
+                                                                    const menuHeight = 220;
+                                                                    const menuWidth = 176;
+
+                                                                    const spaceBelow =
+                                                                        window.innerHeight - buttonRect.bottom;
+
+                                                                    const placement =
+                                                                        spaceBelow < menuHeight
+                                                                            ? "top"
+                                                                            : "bottom";
+
+                                                                    setTaskMenuPlacement(placement);
+
+                                                                    setTaskMenuPosition({
+                                                                        top:
+                                                                            placement === "top"
+                                                                                ? buttonRect.top - menuHeight
+                                                                                : buttonRect.bottom + 4,
+                                                                        left:
+                                                                            buttonRect.right - menuWidth,
+                                                                    });
+
+                                                                    setOpenTaskMenuId(task.id);
+                                                                }}
+                                                                className="inline-flex min-h-10 min-w-10 items-center justify-center rounded-xl p-2 text-[var(--text-muted)] transition-colors duration-150 hover:bg-[var(--surface-subtle)] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+                                                                aria-label={`Actions for ${task.title}`}
+                                                                aria-expanded={
+                                                                    openTaskMenuId === task.id
+                                                                }
+                                                            >
+                                                                <MoreHorizontal size={18} />
+                                                            </button>
 
                                                             {openTaskMenuId === task.id && (
                                                                 <div

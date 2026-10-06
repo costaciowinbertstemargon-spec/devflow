@@ -28,6 +28,8 @@ export default function ProjectsPage() {
     const { user } = useAuth();
     const [canCreateProject, setCanCreateProject] = useState(false);
     const createProjectButtonRef = useRef<HTMLButtonElement>(null);
+    const createProjectModalRef = useRef<HTMLDivElement>(null);
+    const wasCreateModalOpenRef = useRef(false);
 
     const [projects, setProjects] = useState<Project[]>([]);
     const [loading, setLoading] = useState(true);
@@ -161,10 +163,67 @@ export default function ProjectsPage() {
 
     useEffect(() => {
         if (createModalOpen) {
+            wasCreateModalOpenRef.current = true;
             return;
         }
 
+        if (!wasCreateModalOpenRef.current) {
+            return;
+        }
+
+        wasCreateModalOpenRef.current = false;
         createProjectButtonRef.current?.focus();
+    }, [createModalOpen]);
+
+    useEffect(() => {
+        if (!createModalOpen) {
+            return;
+        }
+
+        const modal = createProjectModalRef.current;
+
+        if (!modal) {
+            return;
+        }
+
+        const focusableElements =
+            modal.querySelectorAll<HTMLElement>(
+                'button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [href], [tabindex]:not([tabindex="-1"])'
+            );
+
+        if (focusableElements.length === 0) {
+            return;
+        }
+
+        const firstElement = focusableElements[0];
+        const lastElement =
+            focusableElements[focusableElements.length - 1];
+
+        function handleTabKey(event: KeyboardEvent) {
+            if (event.key !== "Tab") {
+                return;
+            }
+
+            if (event.shiftKey && document.activeElement === firstElement) {
+                event.preventDefault();
+                lastElement.focus();
+                return;
+            }
+
+            if (!event.shiftKey && document.activeElement === lastElement) {
+                event.preventDefault();
+                firstElement.focus();
+            }
+        }
+
+        document.addEventListener("keydown", handleTabKey);
+
+        return () => {
+            document.removeEventListener(
+                "keydown",
+                handleTabKey
+            );
+        };
     }, [createModalOpen]);
 
     async function handleCreateProject(
@@ -479,7 +538,7 @@ export default function ProjectsPage() {
                                             setProjectDescription("");
                                             setCreateModalOpen(true);
                                         }}
-                                        className="mt-5 inline-flex items-center justify-center rounded-lg bg-[var(--primary)] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--primary-hover)]"
+                                        className="mt-5 inline-flex items-center justify-center rounded-lg bg-[var(--primary)] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--primary-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2"
                                     >
                                         Create your first project
                                     </button>
@@ -592,6 +651,7 @@ export default function ProjectsPage() {
                             />
 
                             <div
+                                ref={createProjectModalRef}
                                 role="dialog"
                                 aria-modal="true"
                                 aria-labelledby="create-project-title"
