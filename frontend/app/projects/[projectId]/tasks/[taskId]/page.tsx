@@ -29,7 +29,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 
 function formatStatus(status: string) {
     switch (status) {
@@ -109,6 +109,7 @@ export default function TaskDetailsPage() {
 
     const [taskMembers, setTaskMembers] = useState<TaskMember[]>([]);
     const [addingTaskMember, setAddingTaskMember] = useState(false);
+    const [removingTaskMember, setRemovingTaskMember] = useState<string | null>(null);
     const [selectedTaskMember, setSelectedTaskMember] = useState("");
     const [taskMemberError, setTaskMemberError] = useState("");   
 
@@ -126,6 +127,11 @@ export default function TaskDetailsPage() {
     const [savingTask, setSavingTask] = useState(false);
     const [taskFormError, setTaskFormError] = useState("");
 
+    const editTaskTitleRef = useRef<HTMLInputElement>(null);
+    const editTaskModalRef = useRef<HTMLDivElement>(null);
+    const editTaskButtonRef = useRef<HTMLButtonElement>(null);
+    const wasEditTaskModalOpenRef = useRef(false);
+
     const [comments, setComments] = useState<TaskComment[]>([]);
     const [commentsLoading, setCommentsLoading] = useState(true);
     const [commentsError, setCommentsError] = useState("");
@@ -138,67 +144,68 @@ export default function TaskDetailsPage() {
 
     useEffect(() => {
         async function loadTask() {
-            const token =
-                localStorage.getItem(
-                    "devflow_token"
-                );
+            const token = getToken();
 
             if (!token) {
-                setError(
-                    "Authentication required."
-                );
+                setError("Authentication required.");
                 setLoading(false);
+                setCommentsLoading(false);
+                setActivitiesLoading(false);
                 return;
             }
 
             if (!taskId) {
-                setError(
-                    "Task ID is missing."
-                );
+                setError("Task ID is missing.");
                 setLoading(false);
+                setCommentsLoading(false);
+                setActivitiesLoading(false);
                 return;
             }
 
             setLoading(true);
+            setCommentsLoading(true);
+            setActivitiesLoading(true);
+
             setError("");
+            setCommentsError("");
+            setActivitiesError("");
+            setTaskMemberError("");
 
             try {
-                const [
-                    taskResult,
-                    commentsResult,
-                    activitiesResult,
-                    taskMembersResult,
-                ] = await Promise.all([
-                    getTask(taskId, token),
-                    getTaskComments(taskId, token),
-                    getTaskActivities(taskId, token),
-                    getTaskMembers(taskId, token),
-                ]);
+                const taskResult = await getTask(
+                    taskId,
+                    token
+                );
 
                 setTask(taskResult);
-                setComments(commentsResult);
-                setActivities(activitiesResult);
-                setTaskMembers(taskMembersResult);
 
-                const organization =
-                    await getOrganization(
-                        taskResult.project?.organizationId ?? "",
-                        token
-                    );
+                const organizationId =
+                    taskResult.project?.organizationId;
 
-                setOrganizationMembers(
-                    organization.members
-                );
+                if (organizationId) {
+                    try {
+                        const organization =
+                            await getOrganization(
+                                organizationId,
+                                token
+                            );
 
-                const membership =
-                    organization.members.find(
-                        (member) => member.userId === user?.id
-                    );
+                        setOrganizationMembers(
+                            organization.members
+                        );
+                    } catch (error) {
+                        console.error(
+                            "Failed to load organization members:",
+                            error
+                        );
 
-                setCanEditTask(
-                    membership?.role === "OWNER" ||
-                    membership?.role === "ADMIN"
-                );
+                        setOrganizationMembers([]);
+                        setCanEditTask(false);
+                    }
+                } else {
+                    setOrganizationMembers([]);
+                    setCanEditTask(false);
+                }
             } catch (error) {
                 const message =
                     error instanceof Error
@@ -206,17 +213,235 @@ export default function TaskDetailsPage() {
                         : "Failed to load task details.";
 
                 setError(message);
-                setCommentsError(message);
-                setActivitiesError(message);
-            } finally {
+
                 setLoading(false);
                 setCommentsLoading(false);
                 setActivitiesLoading(false);
+
+                return;
+            } finally {
+                setLoading(false);
+            }
+
+            try {
+                const commentsResult =
+                    await getTaskComments(
+                        taskId,
+                        token
+                    );
+
+                setComments(commentsResult);
+                setCommentsError("");
+            } catch (error) {
+                const message =
+                    error instanceof Error
+                        ? error.message
+                        : "Failed to load comments.";
+
+                console.error(
+                    "Failed to load task comments:",
+                    error
+                );
+
+                setCommentsError(message);
+            } finally {
+                setCommentsLoading(false);
+            }
+
+            try {
+                const activitiesResult =
+                    await getTaskActivities(
+                        taskId,
+                        token
+                    );
+
+                setActivities(activitiesResult);
+                setActivitiesError("");
+            } catch (error) {
+                const message =
+                    error instanceof Error
+                        ? error.message
+                        : "Failed to load activities.";
+
+                console.error(
+                    "Failed to load task activities:",
+                    error
+                );
+
+                setActivitiesError(message);
+            } finally {
+                setActivitiesLoading(false);
+            }
+
+            try {
+                const taskMembersResult =
+                    await getTaskMembers(
+                        taskId,
+                        token
+                    );
+
+                setTaskMembers(taskMembersResult);
+                setTaskMemberError("");
+            } catch (error) {
+                const message =
+                    error instanceof Error
+                        ? error.message
+                        : "Failed to load task members.";
+
+                console.error(
+                    "Failed to load task members:",
+                    error
+                );
+
+                setTaskMembers([]);
+                setTaskMemberError(message);
             }
         }
 
         void loadTask();
-    }, [taskId]);
+    }, [taskId, user?.id]);
+
+    useEffect(() => {
+        if (!user?.id) {
+            setCanEditTask(false);
+            return;
+        }
+
+        const membership = organizationMembers.find(
+            (member) =>
+                member.userId === user.id
+        );
+
+        setCanEditTask(
+            membership?.role === "OWNER" ||
+            membership?.role === "ADMIN"
+        );
+    }, [organizationMembers, user?.id]);
+
+    function openEditTask() {
+        if (!task) {
+            return;
+        }
+
+        setTaskTitle(task.title);
+        setTaskDescription(
+            task.description ?? ""
+        );
+
+        setTaskAssigneeId(
+            task.assigneeId ?? ""
+        );
+
+        setTaskStatus(task.status);
+        setTaskPriority(task.priority);
+
+        if (task.dueDate) {
+            const dueDate = new Date(task.dueDate);
+
+            const year = dueDate.getFullYear();
+            const month = String(
+                dueDate.getMonth() + 1
+            ).padStart(2, "0");
+            const day = String(
+                dueDate.getDate()
+            ).padStart(2, "0");
+
+            setTaskDueDate(
+                `${year}-${month}-${day}`
+            );
+        } else {
+            setTaskDueDate("");
+        }
+
+        setTaskFormError("");
+        setEditTaskModalOpen(true);
+    }
+
+    useEffect(() => {
+        if (!editTaskModalOpen) {
+            return;
+        }
+
+        editTaskTitleRef.current?.focus();
+
+        function handleKeyDown(event: KeyboardEvent) {
+            if (event.key === "Escape") {
+                if (!savingTask) {
+                    setEditTaskModalOpen(false);
+                }
+
+                return;
+            }
+
+            if (event.key !== "Tab") {
+                return;
+            }
+
+            const modal = editTaskModalRef.current;
+
+            if (!modal) {
+                return;
+            }
+
+            const focusableElements =
+                modal.querySelectorAll<HTMLElement>(
+                    'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [href], [tabindex]:not([tabindex="-1"])'
+                );
+
+            if (focusableElements.length === 0) {
+                return;
+            }
+
+            const firstElement =
+                focusableElements[0];
+
+            const lastElement =
+                focusableElements[
+                    focusableElements.length - 1
+                ];
+
+            if (
+                event.shiftKey &&
+                document.activeElement === firstElement
+            ) {
+                event.preventDefault();
+                lastElement.focus();
+            } else if (
+                !event.shiftKey &&
+                document.activeElement === lastElement
+            ) {
+                event.preventDefault();
+                firstElement.focus();
+            }
+        }
+
+        document.addEventListener(
+            "keydown",
+            handleKeyDown
+        );
+
+        return () => {
+            document.removeEventListener(
+                "keydown",
+                handleKeyDown
+            );
+        };
+    }, [editTaskModalOpen, savingTask]);
+
+    useEffect(() => {
+        if (editTaskModalOpen) {
+            wasEditTaskModalOpenRef.current = true;
+            return;
+        }
+
+        if (!wasEditTaskModalOpenRef.current) {
+            return;
+        }
+
+        wasEditTaskModalOpenRef.current = false;
+
+        editTaskButtonRef.current?.focus();
+    }, [editTaskModalOpen]);
 
     async function handleUpdateTask(
         event: React.FormEvent<HTMLFormElement>
@@ -268,6 +493,23 @@ export default function TaskDetailsPage() {
                 );
 
             setTask(updatedTask);
+
+            try {
+                const updatedActivities =
+                    await getTaskActivities(
+                        taskId,
+                        token
+                    );
+
+                setActivities(updatedActivities);
+                setActivitiesError("");
+            } catch (error) {
+                console.error(
+                    "Failed to refresh task activities:",
+                    error
+                );
+            }
+
             setEditTaskModalOpen(false);
 
             setTaskTitle("");
@@ -286,43 +528,12 @@ export default function TaskDetailsPage() {
         }
     }
 
-    function openEditTask() {
-        if (!task) {
-            return;
-        }
-
-        setTaskTitle(task.title);
-        setTaskDescription(
-            task.description ?? ""
-        );
-
-        setTaskAssigneeId(
-            task.assigneeId ?? ""
-        );
-
-        setTaskStatus(task.status);
-        setTaskPriority(task.priority);
-
-        setTaskDueDate(
-            task.dueDate
-                ? new Date(task.dueDate)
-                    .toISOString()
-                    .slice(0, 10)
-                : ""
-        );
-
-        setTaskFormError("");
-        setEditTaskModalOpen(true);
-    }
-
     async function handleCreateComment(
         event: React.FormEvent<HTMLFormElement>
     ) {
         event.preventDefault();
 
-        const token = localStorage.getItem(
-            "devflow_token"
-        );
+        const token = getToken();
 
         const content = commentText.trim();
 
@@ -352,6 +563,22 @@ export default function TaskDetailsPage() {
                 ...currentComments,
                 newComment,
             ]);
+
+            try {
+                const updatedActivities =
+                    await getTaskActivities(
+                        taskId,
+                        token
+                    );
+
+                setActivities(updatedActivities);
+                setActivitiesError("");
+            } catch (error) {
+                console.error(
+                    "Failed to refresh task activities:",
+                    error
+                );
+            }
 
             setCommentText("");
         } catch (error) {
@@ -408,6 +635,7 @@ export default function TaskDetailsPage() {
             return;
         }
 
+        setRemovingTaskMember(userId);
         setTaskMemberError("");
 
         try {
@@ -429,6 +657,8 @@ export default function TaskDetailsPage() {
                     ? error.message
                     : "Failed to remove task member"
             );
+        } finally {
+            setRemovingTaskMember(null);
         }
     }
 
@@ -454,6 +684,16 @@ export default function TaskDetailsPage() {
                     .replace(/_/g, " ");
         }
     }
+
+    const availableTaskMembers = organizationMembers.filter(
+        (member) =>
+            member.userId !== task?.assigneeId &&
+            !taskMembers.some(
+                (taskMember) =>
+                    taskMember.userId ===
+                    member.userId
+            )
+    );
 
     return (
         <ProtectedRoute>
@@ -518,6 +758,7 @@ export default function TaskDetailsPage() {
                                         </div>
                                         {canEditTask && (
                                             <button
+                                                ref={editTaskButtonRef}
                                                 type="button"
                                                 onClick={openEditTask}
                                                 className="inline-flex items-center justify-center gap-2 rounded-lg border border-[var(--border)] px-3.5 py-2.5 text-sm font-medium text-[var(--text-secondary)] transition hover:bg-[var(--surface-subtle)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2"
@@ -646,14 +887,19 @@ export default function TaskDetailsPage() {
                                                     {canEditTask && (
                                                         <button
                                                             type="button"
+                                                            disabled={
+                                                                removingTaskMember === member.userId
+                                                            }
                                                             onClick={() =>
                                                                 handleRemoveTaskMember(
                                                                     member.userId
                                                                 )
                                                             }
-                                                            className="ml-3 shrink-0 rounded-md px-2 py-1 text-xs font-medium text-slate-500 transition hover:bg-red-50 hover:text-red-600"
+                                                            className="ml-3 shrink-0 rounded-md px-2 py-1 text-xs font-medium text-slate-500 transition hover:bg-red-50 hover:text-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                                                         >
-                                                            Remove
+                                                            {removingTaskMember === member.userId
+                                                                ? "Removing..."
+                                                                : "Remove"}
                                                         </button>
                                                     )}
                                                 </div>
@@ -671,31 +917,23 @@ export default function TaskDetailsPage() {
                                                             event.target.value
                                                         )
                                                     }
-                                                    className="min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
+                                                    disabled={availableTaskMembers.length === 0}
+                                                    className="min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500 focus:ring-2 focus:ring-slate-200 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
                                                 >
                                                     <option value="">
-                                                        Add a collaborator
+                                                        {availableTaskMembers.length === 0
+                                                            ? "No collaborators available"
+                                                            : "Add a collaborator"}
                                                     </option>
 
-                                                    {organizationMembers
-                                                        .filter(
-                                                            (member) =>
-                                                                member.userId !==
-                                                                    task?.assigneeId &&
-                                                                !taskMembers.some(
-                                                                    (taskMember) =>
-                                                                        taskMember.userId ===
-                                                                        member.userId
-                                                                )
-                                                        )
-                                                        .map((member) => (
-                                                            <option
-                                                                key={member.userId}
-                                                                value={member.userId}
-                                                            >
-                                                                {member.user.name}
-                                                            </option>
-                                                        ))}
+                                                    {availableTaskMembers.map((member) => (
+                                                        <option
+                                                            key={member.userId}
+                                                            value={member.userId}
+                                                        >
+                                                            {member.user.name}
+                                                        </option>
+                                                    ))}
                                                 </select>
 
                                                 <button
@@ -808,7 +1046,7 @@ export default function TaskDetailsPage() {
                                                         </p>
                                                     </div>
 
-                                                    <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-[var(--text-secondary)]">
+                                                    <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-[var(--text-secondary)] [overflow-wrap:anywhere]">
                                                         {comment.content}
                                                     </p>
                                                 </div>
@@ -840,13 +1078,26 @@ export default function TaskDetailsPage() {
                                     placeholder="Write a comment..."
                                     className="w-full resize-none rounded-xl border border-[var(--border)] bg-white px-4 py-3 text-sm outline-none transition placeholder:text-[var(--text-muted)] focus:border-[var(--primary)] focus:ring-4 focus:ring-[var(--accent)]/10 focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
                                 />
+                            
+                                <div className="mt-1 flex justify-end">
+                                    <span
+                                        className={`text-xs ${
+                                            commentText.length > 500
+                                                ? "text-red-600"
+                                                : "text-[var(--text-muted)]"
+                                        }`}
+                                    >
+                                        {commentText.length}/500
+                                    </span>
+                                </div>
 
                                 <div className="mt-3 flex justify-end">
                                     <button
                                         type="submit"
                                         disabled={
                                             submittingComment ||
-                                            !commentText.trim()
+                                            !commentText.trim() ||
+                                            commentText.length > 500
                                         }
                                         className="rounded-lg bg-[var(--primary)] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--primary-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
                                     >
@@ -925,7 +1176,7 @@ export default function TaskDetailsPage() {
                                                 (activity) => (
                                                     <div
                                                         key={activity.id}
-                                                        className="relative flex gap-4"
+                                                        className="relative flex gap-3 sm:gap-4"
                                                     >
                                                         <div className="relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--surface)] text-xs font-semibold text-[var(--primary)]">
                                                             {activity.user.name
@@ -971,13 +1222,16 @@ export default function TaskDetailsPage() {
                             <button
                                 type="button"
                                 aria-label="Close edit task dialog"
-                                onClick={() =>
-                                    setEditTaskModalOpen(false)
-                                }
+                                onClick={() =>{
+                                    if (!savingTask) {
+                                        setEditTaskModalOpen(false);
+                                    }
+                                }}
                                 className="absolute inset-0 cursor-default"
                             />
 
                             <div
+                                ref={editTaskModalRef}
                                 role="dialog"
                                 aria-modal="true"
                                 aria-labelledby="edit-task-title"
@@ -1018,6 +1272,7 @@ export default function TaskDetailsPage() {
                                         </label>
 
                                         <input
+                                            ref={editTaskTitleRef}
                                             id="edit-task-title"
                                             type="text"
                                             value={taskTitle}
@@ -1179,9 +1434,11 @@ export default function TaskDetailsPage() {
                                     <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-end">
                                         <button
                                             type="button"
-                                            onClick={() =>
-                                                setEditTaskModalOpen(false)
-                                            }
+                                            onClick={() => {
+                                                if (!savingTask) {
+                                                    setEditTaskModalOpen(false);
+                                                }
+                                            }}
                                             className="rounded-xl border border-[var(--border)] px-4 py-2.5 text-sm font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--surface-subtle)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2"
                                         >
                                             Cancel
