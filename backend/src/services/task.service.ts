@@ -40,6 +40,22 @@ export async function  createTask(
         throw new Error("Project not found");
     }
 
+    const requesterMembership =
+        await prisma.organizationMember.findUnique({
+            where: {
+                userId_organizationId: {
+                    userId,
+                    organizationId: project.organizationId,
+                },
+            },
+        });
+
+    if (!requesterMembership) {
+        throw new Error(
+            "You are not a member of this organization"
+        );
+    }
+
     if (input.assigneeId) {
         const assignee = await prisma.user.findUnique({
             where: {
@@ -51,18 +67,18 @@ export async function  createTask(
             throw new Error("Assignee not found");
         }
 
-        const membership =
+        const assigneeMembership =
             await prisma.organizationMember.findUnique({
                 where: {
                     userId_organizationId: {
-                        userId,
+                        userId: input.assigneeId,
                         organizationId: project.organizationId,
                     },
                 },
             });
-        
-        if (!membership) {
-            throw new Error (
+
+        if (!assigneeMembership) {
+            throw new Error(
                 "Assignee is not a member of the project organization"
             );
         }

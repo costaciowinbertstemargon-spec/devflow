@@ -143,6 +143,8 @@ export default function TaskDetailsPage() {
     const [activitiesError, setActivitiesError] = useState("");
 
     useEffect(() => {
+        let cancelled = false;
+
         async function loadTask() {
             const token = getToken();
 
@@ -177,6 +179,8 @@ export default function TaskDetailsPage() {
                     token
                 );
 
+                if (cancelled) return;
+
                 setTask(taskResult);
 
                 const organizationId =
@@ -189,11 +193,15 @@ export default function TaskDetailsPage() {
                                 organizationId,
                                 token
                             );
+                        
+                        if (cancelled) return;
 
                         setOrganizationMembers(
                             organization.members
                         );
                     } catch (error) {
+                        if (cancelled) return;
+
                         console.error(
                             "Failed to load organization members:",
                             error
@@ -207,6 +215,8 @@ export default function TaskDetailsPage() {
                     setCanEditTask(false);
                 }
             } catch (error) {
+                if (cancelled) return;
+
                 const message =
                     error instanceof Error
                         ? error.message
@@ -220,7 +230,9 @@ export default function TaskDetailsPage() {
 
                 return;
             } finally {
-                setLoading(false);
+                if (!cancelled) {
+                    setLoading(false);
+                }
             }
 
             try {
@@ -230,9 +242,13 @@ export default function TaskDetailsPage() {
                         token
                     );
 
+                if (cancelled) return;
+
                 setComments(commentsResult);
                 setCommentsError("");
             } catch (error) {
+                if (cancelled) return;
+
                 const message =
                     error instanceof Error
                         ? error.message
@@ -245,7 +261,9 @@ export default function TaskDetailsPage() {
 
                 setCommentsError(message);
             } finally {
-                setCommentsLoading(false);
+                if (!cancelled) {
+                    setCommentsLoading(false);
+                }
             }
 
             try {
@@ -255,9 +273,13 @@ export default function TaskDetailsPage() {
                         token
                     );
 
+                if (cancelled) return;
+
                 setActivities(activitiesResult);
                 setActivitiesError("");
             } catch (error) {
+                if (cancelled) return;
+                
                 const message =
                     error instanceof Error
                         ? error.message
@@ -270,7 +292,9 @@ export default function TaskDetailsPage() {
 
                 setActivitiesError(message);
             } finally {
-                setActivitiesLoading(false);
+                if (!cancelled) {
+                    setActivitiesLoading(false);
+                }
             }
 
             try {
@@ -280,9 +304,13 @@ export default function TaskDetailsPage() {
                         token
                     );
 
+                if (cancelled) return;
+
                 setTaskMembers(taskMembersResult);
                 setTaskMemberError("");
             } catch (error) {
+                if (cancelled) return;
+
                 const message =
                     error instanceof Error
                         ? error.message
@@ -299,6 +327,10 @@ export default function TaskDetailsPage() {
         }
 
         void loadTask();
+
+        return () => {
+            cancelled = true;
+        }
     }, [taskId, user?.id]);
 
     useEffect(() => {
@@ -442,6 +474,52 @@ export default function TaskDetailsPage() {
 
         editTaskButtonRef.current?.focus();
     }, [editTaskModalOpen]);
+
+    async function handleRetryComments() {
+        const token = getToken();
+
+        if (!token || !taskId) return;
+
+        setCommentsLoading(true);
+        setCommentsError("");
+
+        try {
+            const result = await getTaskComments(taskId, token);
+            setComments(result);
+        } catch (error) {
+            const message =
+                error instanceof Error
+                    ? error.message
+                    : "Failed to load comments.";
+
+            setCommentsError(message);
+        } finally {
+            setCommentsLoading(false);
+        }
+    }
+
+    async function handleRetryActivities() {
+        const token = getToken();
+
+        if (!token || !taskId) return;
+
+        setActivitiesLoading(true);
+        setActivitiesError("");
+
+        try {
+            const result = await getTaskActivities(taskId, token);
+            setActivities(result);
+        } catch (error) {
+            const message =
+                error instanceof Error
+                    ? error.message
+                    : "Failed to load activities.";
+
+            setActivitiesError(message);
+        } finally {
+            setActivitiesLoading(false);
+        }
+    }
 
     async function handleUpdateTask(
         event: React.FormEvent<HTMLFormElement>
@@ -961,261 +1039,283 @@ export default function TaskDetailsPage() {
                                 </div>
                             </div>
                         )}
+                    
+                    {!loading && !error && task && (
+                        <div className="mt-6 rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
+                            <div className="border-b border-[var(--border)] px-5 py-5 sm:px-6">
+                                <h2 className="text-lg font-semibold">
+                                    Comments
+                                </h2>
 
-                    <div className="mt-6 rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
-                        <div className="border-b border-[var(--border)] px-5 py-5 sm:px-6">
-                            <h2 className="text-lg font-semibold">
-                                Comments
-                            </h2>
+                                <p className="mt-1 text-sm text-[var(--text-secondary)]">
+                                    Discuss this task with your team.
+                                </p>
+                            </div>
 
-                            <p className="mt-1 text-sm text-[var(--text-secondary)]">
-                                Discuss this task with your team.
-                            </p>
-                        </div>
-
-                        <div className="p-5 sm:p-6">
-                            {commentsLoading && (
-                                <div className="space-y-4">
-                                    {[1, 2].map((item) => (
-                                        <div
-                                            key={item}
-                                            className="flex gap-3"
-                                        >
-                                            <div className="h-9 w-9 animate-pulse rounded-full bg-[var(--surface-subtle)]" />
-
-                                            <div className="flex-1">
-                                                <div className="h-4 w-32 animate-pulse rounded bg-[var(--surface-subtle)]" />
-
-                                                <div className="mt-2 h-4 w-3/4 animate-pulse rounded bg-[var(--surface-subtle)]" />
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-
-                            {!commentsLoading &&
-                                commentsError && (
-                                    <div
-                                        role="alert"
-                                        className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
-                                    >
-                                        {commentsError}
-                                    </div>
-                                )}
-
-                            {!commentsLoading &&
-                                !commentsError &&
-                                comments.length === 0 && (
-                                    <div className="py-8 text-center">
-                                        <p className="text-sm font-medium">
-                                            No comments yet
-                                        </p>
-
-                                        <p className="mt-1 text-sm text-[var(--text-secondary)]">
-                                            Start the conversation about this task.
-                                        </p>
-                                    </div>
-                                )}
-
-                            {!commentsLoading &&
-                                !commentsError &&
-                                comments.length > 0 && (
-                                    <div className="space-y-6">
-                                        {comments.map((comment) => (
+                            <div className="p-5 sm:p-6">
+                                {commentsLoading && (
+                                    <div className="space-y-4">
+                                        {[1, 2].map((item) => (
                                             <div
-                                                key={comment.id}
+                                                key={item}
                                                 className="flex gap-3"
                                             >
-                                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--surface-subtle)] text-xs font-semibold text-[var(--primary)]">
-                                                    {comment.user.name
-                                                        .trim()
-                                                        .slice(0, 2)
-                                                        .toUpperCase()}
-                                                </div>
+                                                <div className="h-9 w-9 animate-pulse rounded-full bg-[var(--surface-subtle)]" />
 
-                                                <div className="min-w-0 flex-1">
-                                                    <div className="flex flex-wrap items-baseline gap-2">
-                                                        <p className="text-sm font-semibold">
-                                                            {comment.user.name}
-                                                        </p>
+                                                <div className="flex-1">
+                                                    <div className="h-4 w-32 animate-pulse rounded bg-[var(--surface-subtle)]" />
 
-                                                        <p className="text-xs text-[var(--text-muted)]">
-                                                            {new Date(
-                                                                comment.createdAt
-                                                            ).toLocaleString()}
-                                                        </p>
-                                                    </div>
-
-                                                    <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-[var(--text-secondary)] [overflow-wrap:anywhere]">
-                                                        {comment.content}
-                                                    </p>
+                                                    <div className="mt-2 h-4 w-3/4 animate-pulse rounded bg-[var(--surface-subtle)]" />
                                                 </div>
                                             </div>
                                         ))}
                                     </div>
                                 )}
 
-                            <form
-                                onSubmit={handleCreateComment}
-                                className="mt-8 border-t border-[var(--border)] pt-6"
-                            >
-                                <label
-                                    htmlFor="task-comment"
-                                    className="mb-2 block text-sm font-semibold"
-                                >
-                                    Add a comment
-                                </label>
-
-                                <textarea
-                                    id="task-comment"
-                                    value={commentText}
-                                    onChange={(event) =>
-                                        setCommentText(
-                                            event.target.value
-                                        )
-                                    }
-                                    rows={4}
-                                    placeholder="Write a comment..."
-                                    className="w-full resize-none rounded-xl border border-[var(--border)] bg-white px-4 py-3 text-sm outline-none transition placeholder:text-[var(--text-muted)] focus:border-[var(--primary)] focus:ring-4 focus:ring-[var(--accent)]/10 focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
-                                />
-                            
-                                <div className="mt-1 flex justify-end">
-                                    <span
-                                        className={`text-xs ${
-                                            commentText.length > 500
-                                                ? "text-red-600"
-                                                : "text-[var(--text-muted)]"
-                                        }`}
-                                    >
-                                        {commentText.length}/500
-                                    </span>
-                                </div>
-
-                                <div className="mt-3 flex justify-end">
-                                    <button
-                                        type="submit"
-                                        disabled={
-                                            submittingComment ||
-                                            !commentText.trim() ||
-                                            commentText.length > 500
-                                        }
-                                        className="rounded-lg bg-[var(--primary)] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--primary-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
-                                    >
-                                        {submittingComment
-                                            ? "Posting..."
-                                            : "Post comment"}
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-
-                    <div className="mt-6 rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
-                        <div className="border-b border-[var(--border)] px-5 py-5 sm:px-6">
-                            <h2 className="text-lg font-semibold">
-                                Activity
-                            </h2>
-
-                            <p className="mt-1 text-sm text-[var(--text-secondary)]">
-                                A history of changes and actions on this task.
-                            </p>
-                        </div>
-
-                        <div className="p-5 sm:p-6">
-                            {activitiesLoading && (
-                                <div className="space-y-6">
-                                    {[1, 2, 3].map((item) => (
-                                        <div
-                                            key={item}
-                                            className="flex gap-3"
+                                {!commentsLoading && commentsError && (
+                                    <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3">
+                                        <p
+                                            role="alert"
+                                            className="text-sm text-red-700"
                                         >
-                                            <div className="h-9 w-9 animate-pulse rounded-full bg-[var(--surface-subtle)]" />
+                                            {commentsError}
+                                        </p>
 
-                                            <div className="flex-1">
-                                                <div className="h-4 w-64 animate-pulse rounded bg-[var(--surface-subtle)]" />
+                                        <button
+                                            type="button"
+                                            onClick={handleRetryComments}
+                                            className="mt-3 rounded-lg border border-red-300 px-3 py-1.5 text-sm font-medium text-red-700 transition hover:bg-red-100"
+                                        >
+                                            Retry
+                                        </button>
+                                    </div>
+                                )}
 
-                                                <div className="mt-2 h-3 w-32 animate-pulse rounded bg-[var(--surface-subtle)]" />
-                                            </div>
+                                {!commentsLoading &&
+                                    !commentsError &&
+                                    comments.length === 0 && (
+                                        <div className="py-8 text-center">
+                                            <p className="text-sm font-medium">
+                                                No comments yet
+                                            </p>
+
+                                            <p className="mt-1 text-sm text-[var(--text-secondary)]">
+                                                Start the conversation about this task.
+                                            </p>
                                         </div>
-                                    ))}
-                                </div>
-                            )}
+                                    )}
 
-                            {!activitiesLoading &&
-                                activitiesError && (
-                                    <div
-                                        role="alert"
-                                        className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
-                                    >
-                                        {activitiesError}
-                                    </div>
-                                )}
+                                {!commentsLoading &&
+                                    !commentsError &&
+                                    comments.length > 0 && (
+                                        <div className="space-y-6">
+                                            {comments.map((comment) => (
+                                                <div
+                                                    key={comment.id}
+                                                    className="flex gap-3"
+                                                >
+                                                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--surface-subtle)] text-xs font-semibold text-[var(--primary)]">
+                                                        {comment.user.name
+                                                            .trim()
+                                                            .slice(0, 2)
+                                                            .toUpperCase()}
+                                                    </div>
 
-                            {!activitiesLoading &&
-                                !activitiesError &&
-                                activities.length === 0 && (
-                                    <div className="py-8 text-center">
-                                        <p className="text-sm font-medium">
-                                            No activity yet
-                                        </p>
+                                                    <div className="min-w-0 flex-1">
+                                                        <div className="flex flex-wrap items-baseline gap-2">
+                                                            <p className="text-sm font-semibold">
+                                                                {comment.user.name}
+                                                            </p>
 
-                                        <p className="mt-1 text-sm text-[var(--text-secondary)]">
-                                            Changes to this task will appear here.
-                                        </p>
-                                    </div>
-                                )}
-
-                            {!activitiesLoading &&
-                                !activitiesError &&
-                                activities.length > 0 && (
-                                    <div className="relative">
-                                        <div className="absolute bottom-0 left-4 top-0 w-px bg-[var(--border)]" />
-
-                                        <div className="space-y-7">
-                                            {activities.map(
-                                                (activity) => (
-                                                    <div
-                                                        key={activity.id}
-                                                        className="relative flex gap-3 sm:gap-4"
-                                                    >
-                                                        <div className="relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--surface)] text-xs font-semibold text-[var(--primary)]">
-                                                            {activity.user.name
-                                                                .trim()
-                                                                .slice(0, 2)
-                                                                .toUpperCase()}
-                                                        </div>
-
-                                                        <div className="min-w-0 flex-1 pt-0.5">
-                                                            <div className="flex flex-wrap items-baseline gap-1.5">
-                                                                <span className="text-sm font-semibold">
-                                                                    {
-                                                                        activity
-                                                                            .user
-                                                                            .name
-                                                                    }
-                                                                </span>
-
-                                                                <span className="text-sm text-[var(--text-secondary)]">
-                                                                    {getActivityMessage(
-                                                                        activity
-                                                                    )}
-                                                                </span>
-                                                            </div>
-
-                                                            <p className="mt-1 text-xs text-[var(--text-muted)]">
+                                                            <p className="text-xs text-[var(--text-muted)]">
                                                                 {new Date(
-                                                                    activity.createdAt
+                                                                    comment.createdAt
                                                                 ).toLocaleString()}
                                                             </p>
                                                         </div>
+
+                                                        <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-[var(--text-secondary)] [overflow-wrap:anywhere]">
+                                                            {comment.content}
+                                                        </p>
                                                     </div>
-                                                )
-                                            )}
+                                                </div>
+                                            ))}
                                         </div>
+                                    )}
+
+                                <form
+                                    onSubmit={handleCreateComment}
+                                    className="mt-8 border-t border-[var(--border)] pt-6"
+                                >
+                                    <label
+                                        htmlFor="task-comment"
+                                        className="mb-2 block text-sm font-semibold"
+                                    >
+                                        Add a comment
+                                    </label>
+
+                                    <textarea
+                                        id="task-comment"
+                                        value={commentText}
+                                        onChange={(event) =>
+                                            setCommentText(
+                                                event.target.value
+                                            )
+                                        }
+                                        rows={4}
+                                        placeholder="Write a comment..."
+                                        className="w-full resize-none rounded-xl border border-[var(--border)] bg-white px-4 py-3 text-sm outline-none transition placeholder:text-[var(--text-muted)] focus:border-[var(--primary)] focus:ring-4 focus:ring-[var(--accent)]/10 focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
+                                    />
+                                
+                                    <div className="mt-1 flex justify-end">
+                                        <span
+                                            className={`text-xs ${
+                                                commentText.length > 500
+                                                    ? "text-red-600"
+                                                    : "text-[var(--text-muted)]"
+                                            }`}
+                                        >
+                                            {commentText.length}/500
+                                        </span>
+                                    </div>
+
+                                    <div className="mt-3 flex justify-end">
+                                        <button
+                                            type="submit"
+                                            disabled={
+                                                submittingComment ||
+                                                !commentText.trim() ||
+                                                commentText.length > 500
+                                            }
+                                            className="rounded-lg bg-[var(--primary)] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--primary-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+                                        >
+                                            {submittingComment
+                                                ? "Posting..."
+                                                : "Post comment"}
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    )}
+
+                    {!loading && !error && task && (
+                        <div className="mt-6 rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
+                            <div className="border-b border-[var(--border)] px-5 py-5 sm:px-6">
+                                <h2 className="text-lg font-semibold">
+                                    Activity
+                                </h2>
+
+                                <p className="mt-1 text-sm text-[var(--text-secondary)]">
+                                    A history of changes and actions on this task.
+                                </p>
+                            </div>
+
+                            <div className="p-5 sm:p-6">
+                                {activitiesLoading && (
+                                    <div className="space-y-6">
+                                        {[1, 2, 3].map((item) => (
+                                            <div
+                                                key={item}
+                                                className="flex gap-3"
+                                            >
+                                                <div className="h-9 w-9 animate-pulse rounded-full bg-[var(--surface-subtle)]" />
+
+                                                <div className="flex-1">
+                                                    <div className="h-4 w-64 animate-pulse rounded bg-[var(--surface-subtle)]" />
+
+                                                    <div className="mt-2 h-3 w-32 animate-pulse rounded bg-[var(--surface-subtle)]" />
+                                                </div>
+                                            </div>
+                                        ))}
                                     </div>
                                 )}
+
+                                {!activitiesLoading && activitiesError && (
+                                    <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3">
+                                        <p
+                                            role="alert"
+                                            className="text-sm text-red-700"
+                                        >
+                                            {activitiesError}
+                                        </p>
+
+                                        <button
+                                            type="button"
+                                            onClick={handleRetryActivities}
+                                            className="mt-3 rounded-lg border border-red-300 px-3 py-1.5 text-sm font-medium text-red-700 transition hover:bg-red-100"
+                                        >
+                                            Retry
+                                        </button>
+                                    </div>
+                                )}
+
+                                {!activitiesLoading &&
+                                    !activitiesError &&
+                                    activities.length === 0 && (
+                                        <div className="py-8 text-center">
+                                            <p className="text-sm font-medium">
+                                                No activity yet
+                                            </p>
+
+                                            <p className="mt-1 text-sm text-[var(--text-secondary)]">
+                                                Changes to this task will appear here.
+                                            </p>
+                                        </div>
+                                    )}
+
+                                {!activitiesLoading &&
+                                    !activitiesError &&
+                                    activities.length > 0 && (
+                                        <div className="relative">
+                                            <div className="absolute bottom-0 left-4 top-0 w-px bg-[var(--border)]" />
+
+                                            <div className="space-y-7">
+                                                {activities.map(
+                                                    (activity) => (
+                                                        <div
+                                                            key={activity.id}
+                                                            className="relative flex gap-3 sm:gap-4"
+                                                        >
+                                                            <div className="relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--surface)] text-xs font-semibold text-[var(--primary)]">
+                                                                {activity.user.name
+                                                                    .trim()
+                                                                    .slice(0, 2)
+                                                                    .toUpperCase()}
+                                                            </div>
+
+                                                            <div className="min-w-0 flex-1 pt-0.5">
+                                                                <div className="flex flex-wrap items-baseline gap-1.5">
+                                                                    <span className="text-sm font-semibold">
+                                                                        {
+                                                                            activity
+                                                                                .user
+                                                                                .name
+                                                                        }
+                                                                    </span>
+
+                                                                    <span className="text-sm text-[var(--text-secondary)]">
+                                                                        {getActivityMessage(
+                                                                            activity
+                                                                        )}
+                                                                    </span>
+                                                                </div>
+
+                                                                <p className="mt-1 text-xs text-[var(--text-muted)]">
+                                                                    {new Date(
+                                                                        activity.createdAt
+                                                                    ).toLocaleString()}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                                                    )
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+                            </div>
                         </div>
-                    </div>
+                    )}
 
                     {editTaskModalOpen && (
                         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/30 px-4 py-8 backdrop-blur-sm">
